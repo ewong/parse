@@ -1,8 +1,7 @@
 use clap::Parser;
 
 pub(crate) mod models;
-
-use models::chunk::Chunk;
+use models::{app_error::AppError, client_chunk::ClientChunk};
 
 // todo: add regex to look for only .csv files
 #[derive(Parser, Debug)]
@@ -12,12 +11,14 @@ struct Args {
     file: String,
 }
 
-fn main() {
+fn main() -> Result<(), AppError> {
+    // set up logging
+    AppError::init_logging()?;
+
     // process csv into client directory files
     let args = Args::parse();
-    let chunk = Chunk::new(&args.file);
-    let res = chunk.process_csv();
-    if let Err(err) = res {
-        print!("{}", &err.msg);
-    }
+    let chunk = ClientChunk::new(&args.file);
+    chunk.process_csv()?;
+
+    Ok(())
 }

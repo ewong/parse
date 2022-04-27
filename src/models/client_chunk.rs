@@ -2,7 +2,7 @@ use std::fs::File;
 use std::sync::mpsc;
 use std::thread;
 
-use super::error::ModelError;
+use super::app_error::AppError;
 
 const PATH: &str = "model/chunk";
 const FN_PROCESS_CSV: &str = "process_csv";
@@ -22,26 +22,24 @@ test cases
 - invalid number of fields
 */
 
-pub struct Chunk<'a> {
+pub struct ClientChunk<'a> {
     file_path: &'a str, // might not need this
 }
 
-impl<'a> Chunk<'a> {
+impl<'a> ClientChunk<'a> {
     pub fn new(file_path: &'a str) -> Self {
         Self { file_path }
     }
 
-    pub fn process_csv(&self) -> Result<(), ModelError> {
+    pub fn process_csv(&self) -> Result<(), AppError> {
         let (tx, rx) = mpsc::channel();
 
         let path = self.file_path.to_string();
         thread::spawn(move || {
             let res = File::open(&path);
             if res.is_err() {
-                let msg =
-                    ModelError::new(PATH, FN_PROCESS_CSV, "00", &res.err().unwrap().to_string())
-                        .msg;
-                tx.send(msg).unwrap();
+                let e = AppError::new(PATH, FN_PROCESS_CSV, "00", &res.err().unwrap().to_string());
+                tx.send(e.msg).unwrap();
                 return;
             }
 
@@ -49,14 +47,9 @@ impl<'a> Chunk<'a> {
             let mut rdr = csv::Reader::from_reader(f);
             for res in rdr.records() {
                 if res.is_err() {
-                    let msg = ModelError::new(
-                        PATH,
-                        FN_PROCESS_CSV,
-                        "01",
-                        &res.err().unwrap().to_string(),
-                    )
-                    .msg;
-                    tx.send(msg).unwrap();
+                    let e =
+                        AppError::new(PATH, FN_PROCESS_CSV, "01", &res.err().unwrap().to_string());
+                    tx.send(e.msg).unwrap();
                     return;
                 }
                 println!("{:?}", res.unwrap());
