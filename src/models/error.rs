@@ -27,7 +27,7 @@ impl AppError {
 
         let config = Config::builder()
             .appender(Appender::builder().build("logfile", Box::new(logfile)))
-            .build(Root::builder().appender("logfile").build(LevelFilter::Info))
+            .build(Root::builder().appender("logfile").build(LevelFilter::Debug))
             .map_err(|e| AppError::new(PATH, FN_INIT_LOG, "01", &e.to_string()))?;
 
         log4rs::init_config(config)

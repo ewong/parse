@@ -1,7 +1,7 @@
 use clap::Parser;
 
 pub(crate) mod models;
-use models::{app_error::AppError, client_chunk::ClientChunk};
+use models::{client_parser::ClientParser, error::AppError};
 
 // todo: add regex to look for only .csv files
 #[derive(Parser, Debug)]
@@ -17,8 +17,10 @@ fn main() -> Result<(), AppError> {
 
     // process csv into client directory files
     let args = Args::parse();
-    let chunk = ClientChunk::new(&args.file);
-    chunk.process_csv()?;
+    let chunk = ClientParser::new();
+    chunk.linear_chunk_csv(&args.file)?;
+
+    // process client files in to summary files & output
 
     Ok(())
 }
