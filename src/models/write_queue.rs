@@ -31,7 +31,6 @@ pub struct WriteQueue<T> {
     num_threads: u8,
     rx: Option<Receiver<bool>>,
     mtx_shutdown: Arc<Mutex<bool>>,
-    // mtx_q: Arc<Mutex<Vec<HashMap<Vec<u8>, Vec<ByteRecord>>>>>,
     mtx_q: Arc<Mutex<Vec<T>>>,
 }
 
@@ -74,7 +73,6 @@ where
         Ok(())
     }
 
-    // pub fn add(&self, map: HashMap<Vec<u8>, Vec<ByteRecord>>) -> Result<(), AppError> {
     pub fn add(&self, map: T) -> Result<(), AppError> {
         let mut mtx_q = self.get_queue()?;
         let q = &mut (*mtx_q);
@@ -108,7 +106,6 @@ where
         Ok(result)
     }
 
-    // fn get_queue(&self) -> Result<MutexGuard<Vec<HashMap<Vec<u8>, Vec<ByteRecord>>>>, AppError> {
     fn get_queue(&self) -> Result<MutexGuard<Vec<T>>, AppError> {
         for _ in 1..MTX_NUM_TRIES {
             if let Ok(mtx_q) = self.mtx_q.lock() {
@@ -137,22 +134,23 @@ where
                     if let Some(entry) = q.pop() {
                         drop(q);
                         drop(mq);
-                        for (k, v) in entry.map() {
-                            let timer = Timer::start();
-                            let client = String::from_utf8(k.clone()).unwrap();
-                            let mut rows = 0;
-                            for _ in v {
-                                rows += 1;
-                            }
-                            println!(
-                                "worker {} wrote --> block: {}, client: {:?}, num rows: {}",
-                                i,
-                                entry.block(),
-                                client,
-                                rows
-                            );
-                            timer.stop();
-                        }
+                        let _ = WriteQueue::write_tx(i, &entry);
+                        // for (k, v) in entry.map() {
+                        //     let timer = Timer::start();
+                        //     let client = String::from_utf8(k.clone()).unwrap();
+                        //     let mut rows = 0;
+                        //     for _ in v {
+                        //         rows += 1;
+                        //     }
+                        //     println!(
+                        //         "worker {} wrote --> block: {}, client: {:?}, num rows: {}",
+                        //         i,
+                        //         entry.block(),
+                        //         client,
+                        //         rows
+                        //     );
+                        //     timer.stop();
+                        // }
                     }
                 }
 
@@ -174,49 +172,104 @@ where
         Ok(())
     }
 
-    //     pub fn write_client_txns(
-    //         &self,
-    //         client_id: &u32,
-    //         block_id: &usize,
-    //         tx_rows: &Vec<TxRow>,
-    //     ) -> Result<(), AppError> {
-    //         let client_str = ["client", &client_id.to_string()].join("_");
-    //         let dir_path = [OUTPUT_DIR, &client_str].join("/");
-    //         fs::create_dir_all(&dir_path)
-    //             .map_err(|e| AppError::new(PATH, FN_WRITE_CSV, "00", &e.to_string()))?;
+    fn write_tx(i: u8, entry: &T) -> Result<(), AppError> {
+        for (k, v) in entry.map() {
+            let timer = Timer::start();
+            let client = String::from_utf8(k.clone()).unwrap();
+            let mut rows = 0;
+            for _ in v {
+                rows += 1;
+            }
+            println!(
+                "worker {} wrote --> block: {}, client: {:?}, num rows: {}",
+                i,
+                entry.block(),
+                client,
+                rows
+            );
+            timer.stop();
+        }
 
-    //         let file_path = [
-    //             &dir_path,
-    //             "/",
-    //             &client_str,
-    //             "_block_",
-    //             &block_id.to_string(),
-    //             ".csv",
-    //         ]
-    //         .join("");
+        // let client_str = ["client", &client_id.to_string()].join("_");
+        // let dir_path = [OUTPUT_DIR, &client_str].join("/");
+        // fs::create_dir_all(&dir_path)
+        //     .map_err(|e| AppError::new(PATH, FN_WRITE_CSV, "00", &e.to_string()))?;
 
-    //         let mut wtr = csv::Writer::from_path(&file_path)
-    //             .map_err(|e| AppError::new(PATH, FN_WRITE_CSV, "01", &e.to_string()))?;
+        // let file_path = [
+        //     &dir_path,
+        //     "/",
+        //     &client_str,
+        //     "_block_",
+        //     &block_id.to_string(),
+        //     ".csv",
+        // ]
+        // .join("");
 
-    //         wtr.write_record(&["userId", "movieId", "rating", "timestamp"])
-    //             .map_err(|e| AppError::new(PATH, FN_WRITE_CSV, "02", &e.to_string()))?;
+        // let mut wtr = csv::Writer::from_path(&file_path)
+        //     .map_err(|e| AppError::new(PATH, FN_WRITE_CSV, "01", &e.to_string()))?;
 
-    //         for row in tx_rows {
-    //             wtr.write_record(&[
-    //                 &row.type_id.to_string(),
-    //                 &row.client_id.to_string(),
-    //                 &row.tx_id.to_string(),
-    //                 &row.amount.unwrap_or(0).to_string(),
-    //             ])
-    //             .map_err(|e| AppError::new(PATH, FN_WRITE_CSV, "03", &e.to_string()))?;
-    //         }
+        // wtr.write_record(&["userId", "movieId", "rating", "timestamp"])
+        //     .map_err(|e| AppError::new(PATH, FN_WRITE_CSV, "02", &e.to_string()))?;
 
-    //         wtr.flush()
-    //             .map_err(|e| AppError::new(PATH, FN_WRITE_CSV, "04", &e.to_string()))?;
+        // for row in tx_rows {
+        //     wtr.write_record(&[
+        //         &row.type_id.to_string(),
+        //         &row.client_id.to_string(),
+        //         &row.tx_id.to_string(),
+        //         &row.amount.unwrap_or(0).to_string(),
+        //     ])
+        //     .map_err(|e| AppError::new(PATH, FN_WRITE_CSV, "03", &e.to_string()))?;
+        // }
 
-    //         Ok(())
-    //     }
+        // wtr.flush()
+        //     .map_err(|e| AppError::new(PATH, FN_WRITE_CSV, "04", &e.to_string()))?;
+
+        Ok(())
+    }
 }
+
+//     pub fn write_client_txns(
+//         &self,
+//         client_id: &u32,
+//         block_id: &usize,
+//         tx_rows: &Vec<TxRow>,
+//     ) -> Result<(), AppError> {
+//         let client_str = ["client", &client_id.to_string()].join("_");
+//         let dir_path = [OUTPUT_DIR, &client_str].join("/");
+//         fs::create_dir_all(&dir_path)
+//             .map_err(|e| AppError::new(PATH, FN_WRITE_CSV, "00", &e.to_string()))?;
+
+//         let file_path = [
+//             &dir_path,
+//             "/",
+//             &client_str,
+//             "_block_",
+//             &block_id.to_string(),
+//             ".csv",
+//         ]
+//         .join("");
+
+//         let mut wtr = csv::Writer::from_path(&file_path)
+//             .map_err(|e| AppError::new(PATH, FN_WRITE_CSV, "01", &e.to_string()))?;
+
+//         wtr.write_record(&["userId", "movieId", "rating", "timestamp"])
+//             .map_err(|e| AppError::new(PATH, FN_WRITE_CSV, "02", &e.to_string()))?;
+
+//         for row in tx_rows {
+//             wtr.write_record(&[
+//                 &row.type_id.to_string(),
+//                 &row.client_id.to_string(),
+//                 &row.tx_id.to_string(),
+//                 &row.amount.unwrap_or(0).to_string(),
+//             ])
+//             .map_err(|e| AppError::new(PATH, FN_WRITE_CSV, "03", &e.to_string()))?;
+//         }
+
+//         wtr.flush()
+//             .map_err(|e| AppError::new(PATH, FN_WRITE_CSV, "04", &e.to_string()))?;
+
+//         Ok(())
+//     }
 
 // #[derive(Debug, Deserialize, Serialize, Clone)]
 // pub struct TxRow<'a> {
