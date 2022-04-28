@@ -1,3 +1,4 @@
+use crossbeam_channel::{unbounded, Receiver};
 use csv::ByteRecord;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -17,14 +18,18 @@ const MTX_SLEEP_DURATION: u64 = 20;
 
 pub struct WriteQueue {
     started: bool,
+    num_threads: u8,
+    rx: Option<Receiver<bool>>,
     mtx_shutdown: Arc<Mutex<bool>>,
     mtx_q: Arc<Mutex<Vec<HashMap<Vec<u8>, Vec<ByteRecord>>>>>,
 }
 
 impl WriteQueue {
-    pub fn new() -> Self {
+    pub fn new(num_threads: u8) -> Self {
         Self {
             started: false,
+            num_threads,
+            rx: None,
             mtx_shutdown: Arc::new(Mutex::new(true)),
             mtx_q: Arc::new(Mutex::new(Vec::new())),
         }
@@ -34,8 +39,14 @@ impl WriteQueue {
         if self.is_shutdown()? {
             self.started = true;
             self.set_shutdown(false)?;
+
             let mtx_q = Arc::clone(&self.mtx_q);
             let mtx_shutdown = Arc::clone(&self.mtx_shutdown);
+            let (s, r) = unbounded();
+
+            self.rx = Some(r);
+            let tx = s.clone();
+
             thread::spawn(move || loop {
                 // check if there are items to process
                 if let Ok(mq) = &mut mtx_q.lock() {
@@ -58,6 +69,7 @@ impl WriteQueue {
                 // check if need to shut down
                 if let Ok(shutdown) = mtx_shutdown.lock() {
                     if *shutdown {
+                        tx.send(true).unwrap();
                         println!("WriteQueue is shutdown.. Bloop!");
                         return;
                     }
@@ -66,6 +78,7 @@ impl WriteQueue {
                 // sleep
                 thread::sleep(Duration::from_millis(2000));
             });
+            drop(s);
             println!("WriteQueue has started!");
         }
         Ok(())
@@ -76,7 +89,13 @@ impl WriteQueue {
             self.started = false;
             self.set_shutdown(true)?;
         }
-        // todo: block until properly shutdown
+
+        // block until all threads are done
+        if let Some(r) = &self.rx {
+            println!("wq blocking");
+            let _ = r.recv();
+        }
+
         Ok(())
     }
 
@@ -84,7 +103,6 @@ impl WriteQueue {
         let mut mtx_q = self.get_queue()?;
         let q = &mut (*mtx_q);
         q.push(map);
-        println!("added block to queue");
         Ok(())
     }
 

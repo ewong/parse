@@ -11,6 +11,7 @@ const FN_PROCESS_CSV: &str = "linear_group_txns_by_client";
 
 const CLIENT_ID_POS: usize = 1;
 const BLOCK_SIZE: usize = 1_000_000;
+const NUM_THREADS: u8 = 4;
 
 pub struct Transactions;
 
@@ -29,7 +30,7 @@ impl Transactions {
         let mut rows: usize = 0;
 
         let mut map: HashMap<Vec<u8>, Vec<ByteRecord>> = HashMap::new();
-        let mut wq = WriteQueue::new();
+        let mut wq = WriteQueue::new(NUM_THREADS);
         let mut record = ByteRecord::new();
         let mut block_timer = Timer::start();
 
