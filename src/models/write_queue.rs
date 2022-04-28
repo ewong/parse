@@ -1,6 +1,6 @@
 use crossbeam_channel::{unbounded, Receiver};
 use csv::ByteRecord;
-use serde::{Deserialize, Serialize};
+// use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex, MutexGuard};
 use std::thread;
@@ -10,21 +10,35 @@ use super::error::AppError;
 use super::timer::Timer;
 
 const PATH: &str = "model/write_queue";
-// const TXN_DIR: &str = "data/transactions";
+// const TXN_DIR: &str = "parse/txns";
 // const FN_WRITE_CSV: &str = "write_client_txns";
 
 const MTX_NUM_TRIES: u8 = 3;
 const MTX_SLEEP_DURATION: u64 = 20;
 
-pub struct WriteQueue {
+pub trait WriteQueueEntry: Send + Sync + 'static {
+    fn tx_type() -> bool {
+        true
+    }
+    fn block(&self) -> usize {
+        0
+    }
+    fn map(&self) -> &HashMap<Vec<u8>, Vec<ByteRecord>>;
+}
+
+pub struct WriteQueue<T> {
     started: bool,
     num_threads: u8,
     rx: Option<Receiver<bool>>,
     mtx_shutdown: Arc<Mutex<bool>>,
-    mtx_q: Arc<Mutex<Vec<HashMap<Vec<u8>, Vec<ByteRecord>>>>>,
+    // mtx_q: Arc<Mutex<Vec<HashMap<Vec<u8>, Vec<ByteRecord>>>>>,
+    mtx_q: Arc<Mutex<Vec<T>>>,
 }
 
-impl WriteQueue {
+impl<T> WriteQueue<T>
+where
+    T: WriteQueueEntry,
+{
     pub fn new(num_threads: u8) -> Self {
         Self {
             started: false,
@@ -60,7 +74,8 @@ impl WriteQueue {
         Ok(())
     }
 
-    pub fn add(&self, map: HashMap<Vec<u8>, Vec<ByteRecord>>) -> Result<(), AppError> {
+    // pub fn add(&self, map: HashMap<Vec<u8>, Vec<ByteRecord>>) -> Result<(), AppError> {
+    pub fn add(&self, map: T) -> Result<(), AppError> {
         let mut mtx_q = self.get_queue()?;
         let q = &mut (*mtx_q);
         q.push(map);
@@ -93,7 +108,8 @@ impl WriteQueue {
         Ok(result)
     }
 
-    fn get_queue(&self) -> Result<MutexGuard<Vec<HashMap<Vec<u8>, Vec<ByteRecord>>>>, AppError> {
+    // fn get_queue(&self) -> Result<MutexGuard<Vec<HashMap<Vec<u8>, Vec<ByteRecord>>>>, AppError> {
+    fn get_queue(&self) -> Result<MutexGuard<Vec<T>>, AppError> {
         for _ in 1..MTX_NUM_TRIES {
             if let Ok(mtx_q) = self.mtx_q.lock() {
                 return Ok(mtx_q);
@@ -118,18 +134,22 @@ impl WriteQueue {
                 // check if there are items to process
                 if let Ok(mq) = &mut mtx_q.lock() {
                     let q = &mut (*mq);
-                    if let Some(map) = q.pop() {
+                    if let Some(entry) = q.pop() {
                         drop(q);
-                        for (k, v) in map {
+                        drop(mq);
+                        for (k, v) in entry.map() {
                             let timer = Timer::start();
-                            let client = k;
+                            let client = String::from_utf8(k.clone()).unwrap();
                             let mut rows = 0;
                             for _ in v {
                                 rows += 1;
                             }
                             println!(
-                                "worker {} wrote --> client: {:?}, num rows: {}",
-                                i, client, rows
+                                "worker {} wrote --> block: {}, client: {:?}, num rows: {}",
+                                i,
+                                entry.block(),
+                                client,
+                                rows
                             );
                             timer.stop();
                         }
@@ -151,7 +171,6 @@ impl WriteQueue {
             println!("spawned worker {}", i);
         }
 
-        drop(s);
         Ok(())
     }
 
@@ -159,7 +178,6 @@ impl WriteQueue {
     //         &self,
     //         client_id: &u32,
     //         block_id: &usize,
-    //         chunk_id: &usize,
     //         tx_rows: &Vec<TxRow>,
     //     ) -> Result<(), AppError> {
     //         let client_str = ["client", &client_id.to_string()].join("_");
@@ -173,8 +191,6 @@ impl WriteQueue {
     //             &client_str,
     //             "_block_",
     //             &block_id.to_string(),
-    //             "_chunk_",
-    //             &chunk_id.to_string(),
     //             ".csv",
     //         ]
     //         .join("");
@@ -202,25 +218,14 @@ impl WriteQueue {
     //     }
 }
 
-#[derive(Debug, Deserialize, Serialize, Clone)]
-pub struct TxRow<'a> {
-    #[serde(rename(deserialize = "userId", serialize = "userId"))]
-    pub type_id: &'a str,
-    #[serde(rename(deserialize = "movieId", serialize = "movieId"))]
-    pub client_id: u32,
-    #[serde(rename(deserialize = "rating", serialize = "rating"))]
-    pub tx_id: f32,
-    #[serde(rename(deserialize = "timestamp", serialize = "timestamp"))]
-    pub amount: Option<u32>,
-}
-
-// impl<'a> TxRow<'a> {
-//     pub fn new() -> Self {
-//         Self {
-//             type_id: "",
-//             client_id: 0,
-//             tx_id: 0.0,
-//             amount: None,
-//         }
-//     }
+// #[derive(Debug, Deserialize, Serialize, Clone)]
+// pub struct TxRow<'a> {
+//     #[serde(rename(deserialize = "userId", serialize = "userId"))]
+//     pub type_id: &'a str,
+//     #[serde(rename(deserialize = "movieId", serialize = "movieId"))]
+//     pub client_id: u32,
+//     #[serde(rename(deserialize = "rating", serialize = "rating"))]
+//     pub tx_id: f32,
+//     #[serde(rename(deserialize = "timestamp", serialize = "timestamp"))]
+//     pub amount: Option<u32>,
 // }

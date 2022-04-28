@@ -4,14 +4,14 @@ use std::fs;
 
 use super::error::AppError;
 use super::timer::Timer;
-use super::write_queue::WriteQueue;
+use super::write_queue::{WriteQueue, WriteQueueEntry};
 
 const PATH: &str = "model/transactions";
 const FN_PROCESS_CSV: &str = "linear_group_txns_by_client";
 
 const CLIENT_ID_POS: usize = 1;
 const BLOCK_SIZE: usize = 1_000_000;
-const NUM_THREADS: u8 = 3;
+const NUM_THREADS: u8 = 4;
 
 pub struct Transactions;
 
@@ -55,12 +55,12 @@ impl Transactions {
                     wq.start()?;
                 }
 
+                println!("add to wq --> block: {}, num clients: {}", block, map.len());
+                wq.add(TxBlock::new(block, map))?;
+                map = HashMap::new();
+
                 rows = 0;
                 block += 1;
-
-                println!("add to wq --> block: {}, num clients: {}", block, map.len());
-                wq.add(map)?;
-                map = HashMap::new();
 
                 block_timer.stop();
                 println!("----------------------------------------------------");
@@ -73,5 +73,26 @@ impl Transactions {
         wq.stop()?;
         timer.stop();
         Ok(())
+    }
+}
+
+struct TxBlock {
+    block: usize,
+    map: HashMap<Vec<u8>, Vec<ByteRecord>>,
+}
+
+impl TxBlock {
+    fn new(block: usize, map: HashMap<Vec<u8>, Vec<ByteRecord>>) -> Self {
+        Self { block, map }
+    }
+}
+
+impl WriteQueueEntry for TxBlock {
+    fn block(&self) -> usize {
+        self.block
+    }
+
+    fn map(&self) -> &HashMap<Vec<u8>, Vec<ByteRecord>> {
+        &self.map
     }
 }
