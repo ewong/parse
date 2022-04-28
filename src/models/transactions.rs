@@ -1,12 +1,13 @@
-use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
 
 use super::error::AppError;
+use super::tx_row::TxRow;
 
-const PATH: &str = "model/client_parser";
+const PATH: &str = "model/transactions";
+const OUTPUT_DIR: &str = "data/transactions";
 
-const FN_PROCESS_CSV: &str = "process_csv";
+const FN_PROCESS_CSV: &str = "linear_group_txns_by_client";
 const FN_WRITE_CSV: &str = "write_csv";
 
 const BLOCK_SIZE: usize = 1_000_000;
@@ -28,14 +29,14 @@ test cases
 - invalid number of fields
 */
 
-pub struct ClientParser;
+pub struct Transactions;
 
-impl ClientParser {
+impl Transactions {
     pub fn new() -> Self {
         Self {}
     }
 
-    pub fn linear_chunk_csv(&self, csv_path: &str) -> Result<(), AppError> {
+    pub fn linear_group_txns_by_client(&self, csv_path: &str) -> Result<(), AppError> {
         let f = fs::File::open(csv_path)
             .map_err(|e| AppError::new(PATH, FN_PROCESS_CSV, "00", &e.to_string()))?;
 
@@ -104,7 +105,7 @@ impl ClientParser {
         tx_rows: &Vec<TxRow>,
     ) -> Result<(), AppError> {
         let client_str = ["client", &client_id.to_string()].join("_");
-        let dir_path = ["data", "clients", &client_str].join("/");
+        let dir_path = [OUTPUT_DIR, &client_str].join("/");
         fs::create_dir_all(&dir_path)
             .map_err(|e| AppError::new(PATH, FN_WRITE_CSV, "00", &e.to_string()))?;
 
@@ -141,18 +142,6 @@ impl ClientParser {
 
         Ok(())
     }
-}
-
-#[derive(Debug, Deserialize, Serialize)]
-struct TxRow {
-    #[serde(rename(deserialize = "userId", serialize = "userId"))]
-    type_id: String,
-    #[serde(rename(deserialize = "movieId", serialize = "movieId"))]
-    client_id: u32,
-    #[serde(rename(deserialize = "rating", serialize = "rating"))]
-    tx_id: f32,
-    #[serde(rename(deserialize = "timestamp", serialize = "timestamp"))]
-    amount: Option<u32>,
 }
 
 // pub fn process_csv(&self, csv_path: &str) -> Result<(), AppError> {
