@@ -4,6 +4,7 @@ use std::fs;
 
 use super::error::AppError;
 use super::timer::Timer;
+use super::write_queue::WriteQueue;
 // use super::write_queue::WriteQueue;
 
 const PATH: &str = "model/transactions";
@@ -29,6 +30,7 @@ impl Transactions {
         let mut rows: usize = 0;
 
         let mut map: HashMap<Vec<u8>, Vec<ByteRecord>> = HashMap::new();
+        let mut write_queue = WriteQueue::new();
         let mut record = ByteRecord::new();
         let mut block_timer = Timer::start();
 
@@ -37,22 +39,24 @@ impl Transactions {
             .map_err(|e| AppError::new(PATH, FN_PROCESS_CSV, "01", &e.to_string()))?
         {
             if map.contains_key(&record[CLIENT_ID_POS]) {
-                map.entry(record[CLIENT_ID_POS].to_owned()).and_modify(|e| {
+                map.entry(record[CLIENT_ID_POS].to_vec()).and_modify(|e| {
                     e.push(record.clone());
                 });
             } else {
                 let mut v = Vec::new();
                 v.push(record.clone());
-                map.insert(record[CLIENT_ID_POS].to_owned(), v);
+                map.insert(record[CLIENT_ID_POS].to_vec(), v);
             }
 
             rows += 1;
             if rows == BLOCK_SIZE {
-                rows = 0;
-                block += 1;
                 if block == 0 {
                     println!("----------------------------------------------------");
+                    write_queue.start()?;
                 }
+
+                rows = 0;
+                block += 1;
                 println!("write block: {}, num clients: {}", block, map.len());
                 map.clear();
                 println!("map cleared: {}", map.len());
@@ -64,6 +68,7 @@ impl Transactions {
         }
 
         // send remaining data to write queue
+        write_queue.stop()?;
         timer.stop();
         Ok(())
     }
