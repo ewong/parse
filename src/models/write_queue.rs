@@ -6,15 +6,19 @@ use std::thread;
 use std::time::Duration;
 
 use super::error::AppError;
+use super::timer::Timer;
 
 const PATH: &str = "model/write_queue";
 // const TXN_DIR: &str = "data/transactions";
 // const FN_WRITE_CSV: &str = "write_client_txns";
 
+const MTX_NUM_TRIES: u8 = 3;
+const MTX_SLEEP_DURATION: u64 = 20;
+
 pub struct WriteQueue {
     started: bool,
     mtx_shutdown: Arc<Mutex<bool>>,
-    mtx_q: Arc<Mutex<HashMap<Vec<u8>, Vec<ByteRecord>>>>,
+    mtx_q: Arc<Mutex<Vec<HashMap<Vec<u8>, Vec<ByteRecord>>>>>,
 }
 
 impl WriteQueue {
@@ -22,7 +26,7 @@ impl WriteQueue {
         Self {
             started: false,
             mtx_shutdown: Arc::new(Mutex::new(true)),
-            mtx_q: Arc::new(Mutex::new(HashMap::new())),
+            mtx_q: Arc::new(Mutex::new(Vec::new())),
         }
     }
 
@@ -30,15 +34,37 @@ impl WriteQueue {
         if self.is_shutdown()? {
             self.started = true;
             self.set_shutdown(false)?;
+            let mtx_q = Arc::clone(&self.mtx_q);
             let mtx_shutdown = Arc::clone(&self.mtx_shutdown);
             thread::spawn(move || loop {
-                thread::sleep(Duration::from_millis(3000));
+                // check if there are items to process
+                if let Ok(mq) = &mut mtx_q.lock() {
+                    let q = &mut (*mq);
+                    if let Some(map) = q.pop() {
+                        drop(q);
+                        for (k, v) in map {
+                            let timer = Timer::start();
+                            let client = k;
+                            let mut rows = 0;
+                            for _ in v {
+                                rows += 1;
+                            }
+                            println!("wrote --> client: {:?}, num rows: {}", client, rows);
+                            timer.stop();
+                        }
+                    }
+                }
+
+                // check if need to shut down
                 if let Ok(shutdown) = mtx_shutdown.lock() {
                     if *shutdown {
                         println!("WriteQueue is shutdown.. Bloop!");
                         return;
                     }
                 }
+
+                // sleep
+                thread::sleep(Duration::from_millis(2000));
             });
             println!("WriteQueue has started!");
         }
@@ -50,18 +76,27 @@ impl WriteQueue {
             self.started = false;
             self.set_shutdown(true)?;
         }
+        // todo: block until properly shutdown
         Ok(())
     }
 
+    pub fn add(&self, map: HashMap<Vec<u8>, Vec<ByteRecord>>) -> Result<(), AppError> {
+        let mut mtx_q = self.get_queue()?;
+        let q = &mut (*mtx_q);
+        q.push(map);
+        println!("added block to queue");
+        Ok(())
+    }
+
+    // private methods
+
     fn get_shutdown(&self) -> Result<MutexGuard<bool>, AppError> {
-        let mut i = 0;
-        while i < 3 {
+        for _ in 1..MTX_NUM_TRIES {
             if let Ok(mtx_shutdown) = self.mtx_shutdown.lock() {
                 return Ok(mtx_shutdown);
             } else {
-                thread::sleep(Duration::from_millis(10));
+                thread::sleep(Duration::from_millis(MTX_SLEEP_DURATION));
             }
-            i += 1;
         }
         let msg = "error accessing shutdown lock";
         Err(AppError::new(PATH, "get_shutdown", "00", msg))
@@ -78,6 +113,18 @@ impl WriteQueue {
         let mtx_shutdown = self.get_shutdown()?;
         let result = *mtx_shutdown;
         Ok(result)
+    }
+
+    fn get_queue(&self) -> Result<MutexGuard<Vec<HashMap<Vec<u8>, Vec<ByteRecord>>>>, AppError> {
+        for _ in 1..MTX_NUM_TRIES {
+            if let Ok(mtx_q) = self.mtx_q.lock() {
+                return Ok(mtx_q);
+            } else {
+                thread::sleep(Duration::from_millis(MTX_SLEEP_DURATION));
+            }
+        }
+        let msg = "error accessing mtx_q lock";
+        Err(AppError::new(PATH, "get_queue", "00", msg))
     }
 
     //     pub fn write_client_txns(
@@ -139,13 +186,13 @@ pub struct TxRow<'a> {
     pub amount: Option<u32>,
 }
 
-impl<'a> TxRow<'a> {
-    pub fn new() -> Self {
-        Self {
-            type_id: "",
-            client_id: 0,
-            tx_id: 0.0,
-            amount: None,
-        }
-    }
-}
+// impl<'a> TxRow<'a> {
+//     pub fn new() -> Self {
+//         Self {
+//             type_id: "",
+//             client_id: 0,
+//             tx_id: 0.0,
+//             amount: None,
+//         }
+//     }
+// }

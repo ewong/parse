@@ -5,7 +5,6 @@ use std::fs;
 use super::error::AppError;
 use super::timer::Timer;
 use super::write_queue::WriteQueue;
-// use super::write_queue::WriteQueue;
 
 const PATH: &str = "model/transactions";
 const FN_PROCESS_CSV: &str = "linear_group_txns_by_client";
@@ -30,7 +29,7 @@ impl Transactions {
         let mut rows: usize = 0;
 
         let mut map: HashMap<Vec<u8>, Vec<ByteRecord>> = HashMap::new();
-        let mut write_queue = WriteQueue::new();
+        let mut wq = WriteQueue::new();
         let mut record = ByteRecord::new();
         let mut block_timer = Timer::start();
 
@@ -52,14 +51,16 @@ impl Transactions {
             if rows == BLOCK_SIZE {
                 if block == 0 {
                     println!("----------------------------------------------------");
-                    write_queue.start()?;
+                    wq.start()?;
                 }
 
                 rows = 0;
                 block += 1;
-                println!("write block: {}, num clients: {}", block, map.len());
-                map.clear();
-                println!("map cleared: {}", map.len());
+
+                println!("add to wq --> block: {}, num clients: {}", block, map.len());
+                wq.add(map)?;
+                map = HashMap::new();
+
                 block_timer.stop();
                 println!("----------------------------------------------------");
 
@@ -68,7 +69,7 @@ impl Transactions {
         }
 
         // send remaining data to write queue
-        write_queue.stop()?;
+        wq.stop()?;
         timer.stop();
         Ok(())
     }
