@@ -39,46 +39,7 @@ impl WriteQueue {
         if self.is_shutdown()? {
             self.started = true;
             self.set_shutdown(false)?;
-
-            let mtx_q = Arc::clone(&self.mtx_q);
-            let mtx_shutdown = Arc::clone(&self.mtx_shutdown);
-            let (s, r) = unbounded();
-
-            self.rx = Some(r);
-            let tx = s.clone();
-
-            thread::spawn(move || loop {
-                // check if there are items to process
-                if let Ok(mq) = &mut mtx_q.lock() {
-                    let q = &mut (*mq);
-                    if let Some(map) = q.pop() {
-                        drop(q);
-                        for (k, v) in map {
-                            let timer = Timer::start();
-                            let client = k;
-                            let mut rows = 0;
-                            for _ in v {
-                                rows += 1;
-                            }
-                            println!("wrote --> client: {:?}, num rows: {}", client, rows);
-                            timer.stop();
-                        }
-                    }
-                }
-
-                // check if need to shut down
-                if let Ok(shutdown) = mtx_shutdown.lock() {
-                    if *shutdown {
-                        tx.send(true).unwrap();
-                        println!("WriteQueue is shutdown.. Bloop!");
-                        return;
-                    }
-                }
-
-                // sleep
-                thread::sleep(Duration::from_millis(2000));
-            });
-            drop(s);
+            self.spawn_workers()?;
             println!("WriteQueue has started!");
         }
         Ok(())
@@ -88,14 +49,14 @@ impl WriteQueue {
         if self.started {
             self.started = false;
             self.set_shutdown(true)?;
-        }
 
-        // block until all threads are done
-        if let Some(r) = &self.rx {
-            println!("wq blocking");
-            let _ = r.recv();
+            // block until all threads are done
+            if let Some(rx) = &self.rx {
+                for _ in 0..self.num_threads {
+                    rx.recv().unwrap();
+                }
+            }
         }
-
         Ok(())
     }
 
@@ -123,7 +84,6 @@ impl WriteQueue {
     fn set_shutdown(&self, value: bool) -> Result<(), AppError> {
         let mut mtx_shutdown = self.get_shutdown()?;
         *mtx_shutdown = value;
-        println!("mtx_shutdown: {}", *mtx_shutdown);
         Ok(())
     }
 
@@ -143,6 +103,56 @@ impl WriteQueue {
         }
         let msg = "error accessing mtx_q lock";
         Err(AppError::new(PATH, "get_queue", "00", msg))
+    }
+
+    fn spawn_workers(&mut self) -> Result<(), AppError> {
+        let (s, r) = unbounded();
+        self.rx = Some(r);
+
+        for i in 0..self.num_threads {
+            let mtx_q = Arc::clone(&self.mtx_q);
+            let mtx_shutdown = Arc::clone(&self.mtx_shutdown);
+            let tx = s.clone();
+
+            thread::spawn(move || loop {
+                // check if there are items to process
+                if let Ok(mq) = &mut mtx_q.lock() {
+                    let q = &mut (*mq);
+                    if let Some(map) = q.pop() {
+                        drop(q);
+                        for (k, v) in map {
+                            let timer = Timer::start();
+                            let client = k;
+                            let mut rows = 0;
+                            for _ in v {
+                                rows += 1;
+                            }
+                            println!(
+                                "worker {} wrote --> client: {:?}, num rows: {}",
+                                i, client, rows
+                            );
+                            timer.stop();
+                        }
+                    }
+                }
+
+                // check if need to shut down
+                if let Ok(shutdown) = mtx_shutdown.lock() {
+                    if *shutdown {
+                        println!("worker {} is shutdown", i);
+                        tx.send(true).unwrap();
+                        return;
+                    }
+                }
+
+                // sleep
+                thread::sleep(Duration::from_millis(2000));
+            });
+            println!("spawned worker {}", i);
+        }
+
+        drop(s);
+        Ok(())
     }
 
     //     pub fn write_client_txns(
