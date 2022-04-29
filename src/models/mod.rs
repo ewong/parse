@@ -1,4 +1,5 @@
 pub mod account;
+pub mod client_queue;
 pub mod error;
 pub mod queue;
 pub mod timer;

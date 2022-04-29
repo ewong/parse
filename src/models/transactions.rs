@@ -23,19 +23,6 @@ const CLIENT_POS: usize = 1;
 // const TYPE_CHARGEBACK: &[u8] = b"chargeback";
 
 const BLOCK_SIZE: usize = 1_000_000;
-const NUM_THREADS: u8 = 3;
-
-#[derive(Debug, Deserialize, Serialize, Clone)]
-struct TxRow<'a> {
-    #[serde(rename(deserialize = "userId", serialize = "type"))]
-    type_id: &'a [u8],
-    #[serde(rename(deserialize = "movieId", serialize = "client"))]
-    client_id: u32,
-    #[serde(rename(deserialize = "rating", serialize = "tx"))]
-    tx_id: f32,
-    #[serde(rename(deserialize = "timestamp", serialize = "amount"))]
-    amount: Option<u32>,
-}
 
 pub struct Transactions;
 
@@ -50,7 +37,7 @@ impl Transactions {
         let mut rows: usize = 0;
 
         let mut map: HashMap<Vec<u8>, Vec<ByteRecord>> = HashMap::new();
-        let mut tq = TxQueue::new(NUM_THREADS);
+        let mut tq = TxQueue::new();
         let mut record = ByteRecord::new();
         // let headers = rdr
         //     .byte_headers()

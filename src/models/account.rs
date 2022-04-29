@@ -1,93 +1,41 @@
-// use std::fs;
-// use std::time::Instant;
+use std::fs;
 
-// use super::csv::TxRow;
-// use super::error::AppError;
+use super::client_queue::ClientQueue;
+use super::error::AppError;
+use super::queue::Queue;
+use super::timer::Timer;
 
-// const PATH: &str = "models/account";
-// const INPUT_DIR: &str = "data/transactions";
+const PATH: &str = "models/account";
+const INPUT_DIR: &str = "data/transactions";
 // const OUTPUT_DIR: &str = "data/accounts";
 
-// const FN_MERGE_TXNS: &str = "merge_txns";
+const FN_MERGE_TXNS: &str = "merge_txns_by_client";
 
-// /*
-// todo:
-// - get previous summary as a starting point
-// */
+pub struct Account;
 
-// pub struct Account;
+impl Account {
+    pub fn merge_txns_by_client() -> Result<(), AppError> {
+        let timer = Timer::start();
+        let paths = fs::read_dir(INPUT_DIR)
+            .map_err(|e| AppError::new(PATH, FN_MERGE_TXNS, "00", &e.to_string()))?;
 
-// impl Account {
-//     pub fn summarize_txns_by_client() -> Result<(), AppError> {
-//         let time = 
-//         let paths = fs::read_dir(INPUT_DIR)
-//             .map_err(|e| AppError::new(PATH, FN_MERGE_TXNS, "00", &e.to_string()))?;
+        let dir_paths: Vec<String> = paths
+            .map(|e| {
+                if let Ok(path) = e {
+                    if path.path().is_dir() {
+                        return path.path().display().to_string();
+                    }
+                }
+                "".to_string()
+            })
+            .filter(|s| s.len() > 0)
+            .collect();
 
-//         let pool = rayon::ThreadPoolBuilder::new()
-//             .num_threads(4)
-//             .build()
-//             .unwrap();
-
-//         for pres in paths {
-//             pool.spawn(move || {
-//                 if pres.is_err() {
-//                     println!("dead0");
-//                     return;
-//                 }
-
-//                 let res = pres.unwrap().path();
-//                 if !res.is_dir() {
-//                     println!("dead1");
-//                     return;
-//                 }
-
-//                 let opt = res.to_str();
-//                 if opt.is_none() {
-//                     println!("dead2");
-//                     return;
-//                 }
-
-//                 let dir = opt.unwrap().to_string();
-//                 let res = fs::read_dir(&dir);
-//                 if res.is_err() {
-//                     println!("dead3");
-//                     return;
-//                 }
-//                 // println!("{}", dir);
-
-//                 let mut tx_row = TxRow::new();
-//                 let mut count = 0.0;
-
-//                 for file_path in res.unwrap() {
-//                     if file_path.is_err() {
-//                         println!("dead4");
-//                         continue;
-//                     }
-//                     let fp = [&dir, file_path.unwrap().file_name().to_str().unwrap()].join("/");
-//                     let f = fs::File::open(&fp).unwrap();
-
-//                     let mut rdr = csv::Reader::from_reader(f);
-//                     for rdrres in rdr.deserialize() {
-//                         let row: TxRow = rdrres.unwrap();
-//                         if tx_row.client_id == 0 {
-//                             tx_row.type_id = row.type_id;
-//                             tx_row.client_id = row.client_id;
-//                         }
-
-//                         tx_row.tx_id += row.tx_id;
-//                         count += 1.0;
-//                     }
-//                 }
-//                 tx_row.tx_id = tx_row.tx_id / count;
-//                 println!("{:?}, count: {}", tx_row, count);
-
-//                 // write to file
-//             });
-//         }
-
-//         let duration = start.elapsed();
-//         println!("Time elapsed in expensive_function() is: {:?}", duration);
-
-//         Ok(())
-//     }
-// }
+        // println!("num clients: {}", dir_paths.len());
+        let mut cq = ClientQueue::new(dir_paths);
+        cq.start()?;
+        cq.stop()?;
+        timer.stop();
+        Ok(())
+    }
+}

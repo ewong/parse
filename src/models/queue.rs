@@ -8,17 +8,17 @@ use super::error::AppError;
 const PATH: &str = "model/proc_queue";
 const MTX_NUM_TRIES: u8 = 3;
 const MTX_SLEEP_DURATION: u64 = 20;
-const THREAD_SLEEP_DURATION: u64 = 2000;
 
 pub trait Queue<T: Send + Sync + 'static> {
-    fn num_threads(&self) -> u8;
+    fn num_threads() -> u16;
+    fn thread_sleep_duration() -> u64;
     fn started(&self) -> bool;
     fn set_started(&mut self, value: bool);
     fn mtx_q(&self) -> &Arc<Mutex<Vec<T>>>;
     fn mtx_shutdown(&self) -> &Arc<Mutex<bool>>;
     fn rx(&self) -> &Option<Receiver<bool>>;
     fn set_rx(&mut self, rx: Option<Receiver<bool>>);
-    fn process_entry(i: u8, entry: &T) -> Result<(), AppError>;
+    fn process_entry(i: u16, entry: &T) -> Result<(), AppError>;
 
     fn start(&mut self) -> Result<(), AppError> {
         if self.is_shutdown()? {
@@ -37,7 +37,7 @@ pub trait Queue<T: Send + Sync + 'static> {
 
             // block until all threads are done
             if let Some(rx) = self.rx() {
-                for _ in 0..self.num_threads() {
+                for _ in 0..Self::num_threads() {
                     rx.recv().unwrap();
                 }
             }
@@ -92,7 +92,7 @@ pub trait Queue<T: Send + Sync + 'static> {
         let (s, r) = unbounded();
         self.set_rx(Some(r));
 
-        for i in 0..self.num_threads() {
+        for i in 0..Self::num_threads() {
             let mtx_q = Arc::clone(&self.mtx_q());
             let mtx_shutdown = Arc::clone(&self.mtx_shutdown());
             let tx = s.clone();
@@ -100,7 +100,7 @@ pub trait Queue<T: Send + Sync + 'static> {
             thread::spawn(move || loop {
                 let res = mtx_q.lock();
                 if res.is_err() {
-                    thread::sleep(Duration::from_millis(4 * MTX_SLEEP_DURATION));
+                    thread::sleep(Duration::from_millis(MTX_SLEEP_DURATION));
                     continue;
                 }
 
@@ -127,7 +127,7 @@ pub trait Queue<T: Send + Sync + 'static> {
                 }
 
                 // sleep
-                thread::sleep(Duration::from_millis(THREAD_SLEEP_DURATION));
+                thread::sleep(Duration::from_millis(Self::thread_sleep_duration()));
             });
             println!("spawned worker {}", i);
         }
