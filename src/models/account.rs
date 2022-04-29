@@ -15,15 +15,11 @@
 // - get previous summary as a starting point
 // */
 
-// pub struct Account {}
+// pub struct Account;
 
 // impl Account {
-//     pub fn new() -> Self {
-//         Self {}
-//     }
-
-//     pub fn merge_txns(&self) -> Result<(), AppError> {
-//         let start = Instant::now();
+//     pub fn summarize_txns_by_client() -> Result<(), AppError> {
+//         let time = 
 //         let paths = fs::read_dir(INPUT_DIR)
 //             .map_err(|e| AppError::new(PATH, FN_MERGE_TXNS, "00", &e.to_string()))?;
 

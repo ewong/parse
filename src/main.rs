@@ -18,12 +18,10 @@ fn main() -> Result<(), AppError> {
 
         // process csv into client directory files
         let args = Args::parse();
-        let transactions = Transactions::new();
-        transactions.group_txns_by_client(&args.file)?;
+        Transactions::group_txns_by_client(&args.file)?;
     }
 
     // process client files in to summary files & output
-    // let account = Account::new();
-    // account.merge_txns()?;
+    // Account::summarize_txns_by_client()?;
     Ok(())
 }
