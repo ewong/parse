@@ -16,6 +16,7 @@ const EXT: &str = ".csv";
 
 const MTX_NUM_TRIES: u8 = 3;
 const MTX_SLEEP_DURATION: u64 = 20;
+const THREAD_SLEEP_DURATION: u64 = 2000;
 
 pub trait WriteQueueEntry: Send + Sync + 'static {
     fn tx_type() -> bool {
@@ -129,27 +130,36 @@ where
             let tx = s.clone();
 
             thread::spawn(move || loop {
-                // check if there are items to process
-                if let Ok(mq) = &mut mtx_q.lock() {
-                    let q = &mut (*mq);
-                    if let Some(entry) = q.pop() {
-                        drop(q);
-                        drop(mq);
-                        let _ = WriteQueue::write_tx(i, &entry);
-                    }
+                let res = mtx_q.lock();
+                if res.is_err() {
+                    thread::sleep(Duration::from_millis(4 * MTX_SLEEP_DURATION));
+                    continue;
                 }
 
-                // check if need to shut down
-                if let Ok(shutdown) = mtx_shutdown.lock() {
-                    if *shutdown {
-                        println!("worker {} is shutdown", i);
-                        tx.send(true).unwrap();
-                        return;
+                let mut mgq = res.unwrap();
+                let q = &mut (*mgq);
+
+                if q.len() == 0 {
+                    drop(q);
+                    drop(mgq);
+                    if let Ok(shutdown) = mtx_shutdown.lock() {
+                        if *shutdown {
+                            println!("worker {} is shutdown", i);
+                            tx.send(true).unwrap();
+                            return;
+                        }
                     }
+                    continue;
+                }
+
+                if let Some(entry) = q.pop() {
+                    drop(q);
+                    drop(mgq);
+                    let _ = WriteQueue::write_tx(i, &entry);
                 }
 
                 // sleep
-                thread::sleep(Duration::from_millis(2000));
+                thread::sleep(Duration::from_millis(THREAD_SLEEP_DURATION));
             });
             println!("spawned worker {}", i);
         }
@@ -206,4 +216,3 @@ where
         Ok(())
     }
 }
-
