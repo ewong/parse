@@ -4,8 +4,9 @@ use std::collections::HashMap;
 use std::fs;
 
 use super::error::AppError;
+use super::queue::Queue;
 use super::timer::Timer;
-use super::write_queue::{WriteQueue, WriteQueueEntry};
+use super::tx_queue::{TxBlock, TxQueue};
 
 const PATH: &str = "model/transactions";
 const FN_PROCESS_CSV: &str = "linear_group_txns_by_client";
@@ -23,27 +24,6 @@ const CLIENT_POS: usize = 1;
 
 const BLOCK_SIZE: usize = 1_000_000;
 const NUM_THREADS: u8 = 3;
-
-struct TxBlock {
-    block: usize,
-    map: HashMap<Vec<u8>, Vec<ByteRecord>>,
-}
-
-impl TxBlock {
-    fn new(block: usize, map: HashMap<Vec<u8>, Vec<ByteRecord>>) -> Self {
-        Self { block, map }
-    }
-}
-
-impl WriteQueueEntry for TxBlock {
-    fn block(&self) -> usize {
-        self.block
-    }
-
-    fn map(&self) -> &HashMap<Vec<u8>, Vec<ByteRecord>> {
-        &self.map
-    }
-}
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 struct TxRow<'a> {
@@ -70,7 +50,7 @@ impl Transactions {
         let mut rows: usize = 0;
 
         let mut map: HashMap<Vec<u8>, Vec<ByteRecord>> = HashMap::new();
-        let mut wq = WriteQueue::new(NUM_THREADS);
+        let mut tq = TxQueue::new(NUM_THREADS);
         let mut record = ByteRecord::new();
         // let headers = rdr
         //     .byte_headers()
@@ -119,11 +99,11 @@ impl Transactions {
             if rows == BLOCK_SIZE {
                 if block == 0 {
                     println!("----------------------------------------------------");
-                    wq.start()?;
+                    tq.start()?;
                 }
 
-                println!("add to wq --> block: {}, num clients: {}", block, map.len());
-                wq.add(TxBlock::new(block, map))?;
+                println!("add to tq --> block: {}, num clients: {}", block, map.len());
+                tq.add(TxBlock::new(block, map))?;
                 map = HashMap::new();
 
                 rows = 0;
@@ -138,11 +118,15 @@ impl Transactions {
 
         // send remaining data to write queue
         if map.len() > 0 {
-            println!("add to wq --> block: {}, num clients: {}", block + 1, map.len());
-            wq.add(TxBlock::new(block + 1, map))?;
+            println!(
+                "add to tq --> block: {}, num clients: {}",
+                block + 1,
+                map.len()
+            );
+            tq.add(TxBlock::new(block + 1, map))?;
         }
 
-        wq.stop()?;
+        tq.stop()?;
         timer.stop();
         Ok(())
     }
