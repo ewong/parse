@@ -18,7 +18,8 @@ pub trait Queue<T: Send + Sync + 'static> {
     fn mtx_shutdown(&self) -> &Arc<Mutex<bool>>;
     fn rx(&self) -> &Option<Receiver<bool>>;
     fn set_rx(&mut self, rx: Option<Receiver<bool>>);
-    fn process_entry(i: u16, entry: &T) -> Result<(), AppError>;
+    fn out_dir(&self) -> &str;
+    fn process_entry(out_dir: &str, entry: &T, wid: u16) -> Result<(), AppError>;
 
     fn start(&mut self) -> Result<(), AppError> {
         if self.is_shutdown()? {
@@ -92,9 +93,10 @@ pub trait Queue<T: Send + Sync + 'static> {
         let (s, r) = unbounded();
         self.set_rx(Some(r));
 
-        for i in 0..Self::num_threads() {
+        for wid in 0..Self::num_threads() {
             let mtx_q = Arc::clone(&self.mtx_q());
             let mtx_shutdown = Arc::clone(&self.mtx_shutdown());
+            let out_dir_path = self.out_dir().to_owned();
             let tx = s.clone();
 
             thread::spawn(move || loop {
@@ -112,7 +114,7 @@ pub trait Queue<T: Send + Sync + 'static> {
                     drop(mgq);
                     if let Ok(shutdown) = mtx_shutdown.lock() {
                         if *shutdown {
-                            println!("worker {} is shutdown", i);
+                            println!("worker {} is shutdown", wid);
                             tx.send(true).unwrap();
                             return;
                         }
@@ -123,13 +125,13 @@ pub trait Queue<T: Send + Sync + 'static> {
                 if let Some(entry) = q.pop() {
                     drop(q);
                     drop(mgq);
-                    let _ = Self::process_entry(i, &entry);
+                    let _ = Self::process_entry(&out_dir_path, &entry, wid);
                 }
 
                 // sleep
                 thread::sleep(Duration::from_millis(Self::thread_sleep_duration()));
             });
-            println!("spawned worker {}", i);
+            println!("spawned worker {}", wid);
         }
 
         Ok(())

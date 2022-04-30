@@ -1,7 +1,8 @@
 use clap::Parser;
 
 pub(crate) mod models;
-use models::{account::Account, error::AppError, transactions::Transactions};
+
+use models::{error::AppError, processor::Processor};
 
 #[derive(Parser, Debug)]
 #[clap(author, version, about, long_about = None)]
@@ -11,13 +12,8 @@ struct Args {
 }
 
 fn main() -> Result<(), AppError> {
-    {
-        // process csv into client directory files
-        let args = Args::parse();
-        Transactions::group_txns_by_client(&args.file)?;
-    }
-
-    // process client files in to summary files & output
-    // Account::merge_txns_by_client()?;
+    let args = Args::parse();
+    let p = Processor::new(&args.file);
+    p.process_csv()?;
     Ok(())
 }

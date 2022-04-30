@@ -11,19 +11,7 @@ use super::queue::Queue;
 use super::timer::Timer;
 
 const PATH: &str = "model/client_queue";
-const TX_DIR: &str = "data/balances";
 const FN_PROCESS_ENTRY: &str = "process_entry";
-
-const TYPE_POS: usize = 0;
-const CLIENT_POS: usize = 1;
-const TX_POS: usize = 2;
-const AMOUNT_POS: usize = 3;
-
-const TYPE_DEPOSIT: &[u8] = b"deposit";
-const TYPE_WITHDRAW: &[u8] = b"withdraw";
-const TYPE_DISPUTE: &[u8] = b"dispute";
-const TYPE_RESOLVE: &[u8] = b"resolve";
-const TYPE_CHARGEBACK: &[u8] = b"chargeback";
 
 const NUM_THREADS: u16 = 64;
 const THREAD_SLEEP_DURATION: u64 = 100;
@@ -54,6 +42,7 @@ impl<'a> TxRow<'a> {
 pub struct ClientQueue<T> {
     started: bool,
     rx: Option<Receiver<bool>>,
+    out_dir: String,
     arc_shutdown: Arc<Mutex<bool>>,
     arc_q: Arc<Mutex<Vec<T>>>,
 }
@@ -62,10 +51,11 @@ impl<T> ClientQueue<T>
 where
     T: Send + Sync + Display + Debug + AsRef<Path> + 'static,
 {
-    pub fn new(dir_paths: Vec<T>) -> Self {
+    pub fn new(out_dir: &str, dir_paths: Vec<T>) -> Self {
         Self {
             started: false,
             rx: None,
+            out_dir: out_dir.to_owned(),
             arc_shutdown: Arc::new(Mutex::new(true)),
             arc_q: Arc::new(Mutex::new(dir_paths)),
         }
@@ -108,7 +98,11 @@ where
         self.rx = rx;
     }
 
-    fn process_entry(i: u16, entry: &T) -> Result<(), AppError> {
+    fn out_dir(&self) -> &str {
+        &self.out_dir
+    }
+
+    fn process_entry(out_dir: &str, entry: &T, wid: u16) -> Result<(), AppError> {
         let timer = Timer::start();
         let paths = fs::read_dir(entry)
             .map_err(|e| AppError::new(PATH, FN_PROCESS_ENTRY, "00", &e.to_string()))?;
@@ -175,7 +169,10 @@ where
             tx_row.tx_id = tx_row.tx_id / count;
         }
 
-        println!("worker {} wrote --> client {:?}", i, tx_row);
+        println!(
+            "worker {} wrote --> client {:?}, out_dir: {}",
+            wid, tx_row, out_dir
+        );
         timer.stop();
         Ok(())
     }
