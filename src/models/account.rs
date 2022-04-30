@@ -6,7 +6,7 @@ use super::queue::Queue;
 use super::timer::Timer;
 
 const PATH: &str = "models/account";
-const INPUT_DIR: &str = "data/transactions";
+const INPUT_DIR: &str = "data/processing";
 // const OUTPUT_DIR: &str = "data/accounts";
 
 const FN_MERGE_TXNS: &str = "merge_txns_by_client";

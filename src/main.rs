@@ -1,7 +1,7 @@
 use clap::Parser;
 
 pub(crate) mod models;
-use models::{account::Account, error::AppError};
+use models::{account::Account, error::AppError, transactions::Transactions};
 
 #[derive(Parser, Debug)]
 #[clap(author, version, about, long_about = None)]

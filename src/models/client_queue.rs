@@ -25,7 +25,7 @@ const TYPE_DISPUTE: &[u8] = b"dispute";
 const TYPE_RESOLVE: &[u8] = b"resolve";
 const TYPE_CHARGEBACK: &[u8] = b"chargeback";
 
-const NUM_THREADS: u16 = 256;
+const NUM_THREADS: u16 = 64;
 const THREAD_SLEEP_DURATION: u64 = 100;
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
@@ -38,6 +38,17 @@ struct TxRow<'a> {
     tx_id: f32,
     #[serde(rename(deserialize = "timestamp", serialize = "amount"))]
     amount: Option<u32>,
+}
+
+impl<'a> TxRow<'a> {
+    fn new() -> Self {
+        Self {
+            type_id: b"",
+            client_id: 0,
+            tx_id: 0.0,
+            amount: None,
+        }
+    }
 }
 
 pub struct ClientQueue<T> {
@@ -115,13 +126,15 @@ where
             .collect();
         file_paths.sort_by(|a, b| a.cmp(b));
 
+        let mut count = 0.0;
+        let mut record = ByteRecord::new();
+        let mut tx_row = TxRow::new();
+
         for path in file_paths {
             let f = fs::File::open(&path)
                 .map_err(|e| AppError::new(PATH, FN_PROCESS_ENTRY, "00", &e.to_string()))?;
 
             let mut rdr = csv::Reader::from_reader(f);
-            let mut record = ByteRecord::new();
-
             let headers = rdr
                 .byte_headers()
                 .map_err(|e| AppError::new(PATH, FN_PROCESS_ENTRY, "02", &e.to_string()))?
@@ -146,72 +159,24 @@ where
                 //     );
                 // }
 
-                let _: TxRow = record
+                let row: TxRow = record
                     .deserialize(Some(&headers))
                     .map_err(|e| AppError::new(PATH, FN_PROCESS_ENTRY, "04", &e.to_string()))?;
                 // if fail => write user id in tx_error.csv
+
+                if tx_row.client_id == 0 {
+                    tx_row.client_id = row.client_id;
+                }
+
+                tx_row.tx_id += row.tx_id;
+                count += 1.0;
             }
-            println!("worker {} wrote --> processed client file: {}", i, path);
+
+            tx_row.tx_id = tx_row.tx_id / count;
         }
 
+        println!("worker {} wrote --> client {:?}", i, tx_row);
         timer.stop();
         Ok(())
     }
 }
-
-// for pres in paths {
-//     pool.spawn(move || {
-//         if pres.is_err() {
-//             println!("dead0");
-//             return;
-//         }
-
-//         let res = pres.unwrap().path();
-//         if !res.is_dir() {
-//             println!("dead1");
-//             return;
-//         }
-
-//         let opt = res.to_str();
-//         if opt.is_none() {
-//             println!("dead2");
-//             return;
-//         }
-
-//         let dir = opt.unwrap().to_string();
-//         let res = fs::read_dir(&dir);
-//         if res.is_err() {
-//             println!("dead3");
-//             return;
-//         }
-//         // println!("{}", dir);
-
-//         let mut tx_row = TxRow::new();
-//         let mut count = 0.0;
-
-//         for file_path in res.unwrap() {
-//             if file_path.is_err() {
-//                 println!("dead4");
-//                 continue;
-//             }
-//             let fp = [&dir, file_path.unwrap().file_name().to_str().unwrap()].join("/");
-//             let f = fs::File::open(&fp).unwrap();
-
-//             let mut rdr = csv::Reader::from_reader(f);
-//             for rdrres in rdr.deserialize() {
-//                 let row: TxRow = rdrres.unwrap();
-//                 if tx_row.client_id == 0 {
-//                     tx_row.type_id = row.type_id;
-//                     tx_row.client_id = row.client_id;
-//                 }
-
-//                 tx_row.tx_id += row.tx_id;
-//                 count += 1.0;
-//             }
-//         }
-//         tx_row.tx_id = tx_row.tx_id / count;
-//         println!("{:?}, count: {}", tx_row, count);
-
-//         // write to file
-//     });
-// }
