@@ -8,7 +8,7 @@ use super::timer::Timer;
 use super::tx_queue::{TxBlock, TxQueue};
 
 const PATH: &str = "model/transactions";
-const FN_PROCESS_CSV: &str = "linear_group_txns_by_client";
+const FN_PROCESS_CSV: &str = "group_txns_by_client";
 
 const BLOCK_SIZE: usize = 1_000_000;
 

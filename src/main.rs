@@ -12,15 +12,12 @@ struct Args {
 
 fn main() -> Result<(), AppError> {
     {
-        // // set up logging
-        // AppError::init_logging()?;
-
-        // // process csv into client directory files
-        // let args = Args::parse();
-        // Transactions::group_txns_by_client(&args.file)?;
+        // process csv into client directory files
+        let args = Args::parse();
+        Transactions::group_txns_by_client(&args.file)?;
     }
 
     // process client files in to summary files & output
-    Account::merge_txns_by_client()?;
+    // Account::merge_txns_by_client()?;
     Ok(())
 }
