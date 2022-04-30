@@ -18,14 +18,14 @@ const THREAD_SLEEP_DURATION: u64 = 100;
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 struct TxRow<'a> {
-    #[serde(rename(deserialize = "userId", serialize = "type"))]
+    #[serde(rename(deserialize = "type", serialize = "type"))]
     type_id: &'a [u8],
-    #[serde(rename(deserialize = "movieId", serialize = "client"))]
-    client_id: u32,
-    #[serde(rename(deserialize = "rating", serialize = "tx"))]
+    #[serde(rename(deserialize = "client", serialize = "client"))]
+    client_id: u16,
+    #[serde(rename(deserialize = "tx", serialize = "tx"))]
     tx_id: f32,
-    #[serde(rename(deserialize = "timestamp", serialize = "amount"))]
-    amount: Option<u32>,
+    #[serde(rename(deserialize = "amount", serialize = "amount"))]
+    amount: Option<f64>,
 }
 
 impl<'a> TxRow<'a> {

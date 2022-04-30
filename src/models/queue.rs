@@ -5,7 +5,7 @@ use std::time::Duration;
 
 use super::error::AppError;
 
-const PATH: &str = "model/proc_queue";
+const PATH: &str = "model/queue";
 const MTX_NUM_TRIES: u8 = 3;
 const MTX_SLEEP_DURATION: u64 = 20;
 
