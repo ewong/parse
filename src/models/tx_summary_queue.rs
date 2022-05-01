@@ -5,9 +5,9 @@ use std::fs;
 use std::path::Path;
 use std::sync::{Arc, Mutex};
 
-use super::timer::Timer;
 use super::tx_record::TxRecord;
 use crate::lib::error::AppError;
+use crate::lib::timer::Timer;
 use crate::lib::tx_queue::TxQueue;
 
 const PATH: &str = "model/client_queue";
@@ -16,7 +16,7 @@ const FN_PROCESS_ENTRY: &str = "process_entry";
 const NUM_THREADS: u16 = 64;
 const THREAD_SLEEP_DURATION: u64 = 100;
 
-pub struct TxZipQueue<T> {
+pub struct TxSummaryQueue<T> {
     started: bool,
     rx: Option<Receiver<bool>>,
     out_dir: String,
@@ -24,7 +24,7 @@ pub struct TxZipQueue<T> {
     arc_q: Arc<Mutex<Vec<T>>>,
 }
 
-impl<T> TxZipQueue<T>
+impl<T> TxSummaryQueue<T>
 where
     T: Send + Sync + Display + Debug + AsRef<Path> + 'static,
 {
@@ -39,7 +39,7 @@ where
     }
 }
 
-impl<T> TxQueue<T> for TxZipQueue<T>
+impl<T> TxQueue<T> for TxSummaryQueue<T>
 where
     T: Send + Sync + Display + Debug + AsRef<Path> + 'static,
 {

@@ -110,7 +110,7 @@ impl<'a> TxRecord<'a> {
 pub struct TxRecordReader {
     reader: Reader<File>,
     headers: ByteRecord,
-    csv_record: ByteRecord,
+    byte_record: ByteRecord,
 }
 
 impl TxRecordReader {
@@ -123,7 +123,7 @@ impl TxRecordReader {
         Ok(Self {
             reader,
             headers,
-            csv_record: ByteRecord::new(),
+            byte_record: ByteRecord::new(),
         })
     }
 
@@ -132,14 +132,55 @@ impl TxRecordReader {
         Ok(())
     }
 
-    pub fn next(&mut self, tx_record: &mut TxRecord) -> Result<(), AppError> {
+    pub fn byte_record(&self) -> &ByteRecord {
+        &self.byte_record
+    }
+
+    pub fn next_byte_record(&mut self) -> Result<bool, AppError> {
         self.reader
-            .read_byte_record(&mut self.csv_record)
+            .read_byte_record(&mut self.byte_record)
             .map_err(|e| AppError::new(PATH, FN_NEXT, "00", &e.to_string()))?;
+
+        if self.byte_record.len() == 0 {
+            // end of file
+            return Ok(false);
+        }
+
+        // validate
+        let tx_record_type =
+            TxRecordType::from_binary(&self.byte_record[TxRecordType::byte_position()]);
+        if tx_record_type == TxRecordType::NONE {
+            return Err(AppError::new(
+                PATH,
+                FN_NEXT,
+                "01",
+                "invalid transaction record type",
+            ));
+        }
+
+        let _ = self
+            .byte_record
+            .deserialize(Some(&self.headers))
+            .map_err(|e| {
+                println!("{}", &e.to_string());
+                AppError::new(PATH, FN_NEXT, "04", &e.to_string())
+            })?;
+        Ok(true)
+    }
+
+    pub fn next_tx_record(&mut self, tx_record: &mut TxRecord) -> Result<bool, AppError> {
+        self.reader
+            .read_byte_record(&mut self.byte_record)
+            .map_err(|e| AppError::new(PATH, FN_NEXT, "00", &e.to_string()))?;
+
+        if self.byte_record.len() == 0 {
+            // end of file
+            return Ok(false);
+        }
 
         // add validation
         let tx_record_type =
-            TxRecordType::from_binary(&self.csv_record[TxRecordType::byte_position()]);
+            TxRecordType::from_binary(&self.byte_record[TxRecordType::byte_position()]);
         if tx_record_type == TxRecordType::NONE {
             return Err(AppError::new(
                 PATH,
@@ -150,14 +191,14 @@ impl TxRecordReader {
         }
 
         let tx_record = self
-            .csv_record
+            .byte_record
             .deserialize(Some(&self.headers))
             .map_err(|e| {
                 println!("{}", &e.to_string());
                 AppError::new(PATH, FN_NEXT, "04", &e.to_string())
             })?;
 
-        Ok(())
+        Ok(true)
     }
 
     fn csv_reader(csv_path: &str) -> Result<Reader<File>, AppError> {
