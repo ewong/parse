@@ -3,7 +3,7 @@ use std::sync::{Arc, Mutex, MutexGuard};
 use std::thread;
 use std::time::Duration;
 
-use super::error::AppError;
+use crate::models::error::AppError;
 
 const PATH: &str = "model/queue";
 const MTX_NUM_TRIES: u8 = 3;
@@ -26,7 +26,7 @@ pub trait TxQueue<T: Send + Sync + 'static> {
             self.set_started(true);
             self.set_shutdown(false)?;
             self.spawn_workers()?;
-            println!("WriteQueue has started!");
+            println!("TxQueue has started!");
         }
         Ok(())
     }

@@ -6,7 +6,8 @@ use std::sync::{Arc, Mutex};
 
 use super::error::AppError;
 use super::timer::Timer;
-use super::tx_queue::TxQueue;
+use crate::traits::tx_queue::TxQueue;
+use crate::traits::tx_row::{CLIENT_COL, TX_COL, TYPE_COL, AMOUNT_COL};
 
 const PATH: &str = "model/write_queue";
 const FN_PROCESS_ENTRY: &str = "process_entry";
@@ -18,23 +19,23 @@ const WORKER_PARTITION: &str = "_worker_";
 const NUM_THREADS: u16 = 3;
 const THREAD_SLEEP_DURATION: u64 = 500;
 
-pub trait TxClusterQueueEntry: Send + Sync + 'static {
+pub trait TxGroupQueueEntry: Send + Sync + 'static {
     fn block(&self) -> usize;
     fn map(&self) -> &HashMap<Vec<u8>, Vec<ByteRecord>>;
 }
 
-pub struct TxClusterQueueBlock {
+pub struct TxGroupQueueBlock {
     block: usize,
     map: HashMap<Vec<u8>, Vec<ByteRecord>>,
 }
 
-impl TxClusterQueueBlock {
+impl TxGroupQueueBlock {
     pub fn new(block: usize, map: HashMap<Vec<u8>, Vec<ByteRecord>>) -> Self {
         Self { block, map }
     }
 }
 
-impl TxClusterQueueEntry for TxClusterQueueBlock {
+impl TxGroupQueueEntry for TxGroupQueueBlock {
     fn block(&self) -> usize {
         self.block
     }
@@ -44,7 +45,7 @@ impl TxClusterQueueEntry for TxClusterQueueBlock {
     }
 }
 
-pub struct TxClusterQueue<E> {
+pub struct TxGroupQueue<E> {
     started: bool,
     rx: Option<Receiver<bool>>,
     out_dir: String,
@@ -52,9 +53,9 @@ pub struct TxClusterQueue<E> {
     arc_q: Arc<Mutex<Vec<E>>>,
 }
 
-impl<E> TxClusterQueue<E>
+impl<E> TxGroupQueue<E>
 where
-    E: TxClusterQueueEntry,
+    E: TxGroupQueueEntry,
 {
     pub fn new(out_dir: &str) -> Self {
         Self {
@@ -67,9 +68,9 @@ where
     }
 }
 
-impl<T> TxQueue<T> for TxClusterQueue<T>
+impl<T> TxQueue<T> for TxGroupQueue<T>
 where
-    T: TxClusterQueueEntry,
+    T: TxGroupQueueEntry,
 {
     fn num_threads() -> u16 {
         NUM_THREADS
@@ -117,6 +118,7 @@ where
                 .map_err(|e| AppError::new(PATH, FN_PROCESS_ENTRY, "00", &e.to_string()))?;
 
             let dir_path = [out_dir, &client_id_str].join(CLIENT_PARTITION);
+            println!("dir_path: {}", dir_path);
             fs::create_dir_all(&dir_path)
                 .map_err(|e| AppError::new(PATH, FN_PROCESS_ENTRY, "01", &e.to_string()))?;
 
@@ -135,7 +137,7 @@ where
             let mut wtr = csv::Writer::from_path(&file_path)
                 .map_err(|e| AppError::new(PATH, FN_PROCESS_ENTRY, "02", &e.to_string()))?;
             wtr.write_byte_record(&ByteRecord::from(
-                &["userId", "movieId", "rating", "timestamp"][..],
+                &[TYPE_COL, CLIENT_COL, TX_COL, AMOUNT_COL][..],
             ))
             .map_err(|e| AppError::new(PATH, FN_PROCESS_ENTRY, "03", &e.to_string()))?;
 

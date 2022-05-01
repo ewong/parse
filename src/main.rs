@@ -1,6 +1,7 @@
 use clap::Parser;
 
 pub(crate) mod models;
+pub(crate) mod traits;
 
 use models::{error::AppError, processor::Processor};
 

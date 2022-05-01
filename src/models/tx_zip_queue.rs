@@ -7,8 +7,8 @@ use std::sync::{Arc, Mutex};
 
 use super::error::AppError;
 use super::timer::Timer;
-use super::tx_merge_row::TxMergeInputRow;
-use super::tx_queue::TxQueue;
+use super::tx_zip_row::TxZipInputRow;
+use crate::traits::tx_queue::TxQueue;
 
 const PATH: &str = "model/client_queue";
 const FN_PROCESS_ENTRY: &str = "process_entry";
@@ -16,7 +16,7 @@ const FN_PROCESS_ENTRY: &str = "process_entry";
 const NUM_THREADS: u16 = 64;
 const THREAD_SLEEP_DURATION: u64 = 100;
 
-pub struct TxMergeQueue<T> {
+pub struct TxZipQueue<T> {
     started: bool,
     rx: Option<Receiver<bool>>,
     out_dir: String,
@@ -24,7 +24,7 @@ pub struct TxMergeQueue<T> {
     arc_q: Arc<Mutex<Vec<T>>>,
 }
 
-impl<T> TxMergeQueue<T>
+impl<T> TxZipQueue<T>
 where
     T: Send + Sync + Display + Debug + AsRef<Path> + 'static,
 {
@@ -39,7 +39,7 @@ where
     }
 }
 
-impl<T> TxQueue<T> for TxMergeQueue<T>
+impl<T> TxQueue<T> for TxZipQueue<T>
 where
     T: Send + Sync + Display + Debug + AsRef<Path> + 'static,
 {
@@ -99,7 +99,7 @@ where
 
         let mut count = 0.0;
         let mut record = ByteRecord::new();
-        let mut tx_row = TxMergeInputRow::new();
+        let mut tx_row = TxZipInputRow::new();
 
         for path in file_paths {
             let f = fs::File::open(&path)
@@ -130,9 +130,10 @@ where
                 //     );
                 // }
 
-                let row: TxMergeInputRow = record
-                    .deserialize(Some(&headers))
-                    .map_err(|e| AppError::new(PATH, FN_PROCESS_ENTRY, "04", &e.to_string()))?;
+                let row: TxZipInputRow = record.deserialize(Some(&headers)).map_err(|e| {
+                    println!("{}", &e.to_string());
+                    AppError::new(PATH, FN_PROCESS_ENTRY, "04", &e.to_string())
+                })?;
                 // if fail => write user id in tx_error.csv
 
                 if tx_row.client_id == 0 {

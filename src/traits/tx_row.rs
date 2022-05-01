@@ -1,5 +1,10 @@
 use std::str;
 
+pub const TYPE_COL: &str = "type";
+pub const CLIENT_COL: &str = "client";
+pub const TX_COL: &str = "tx";
+pub const AMOUNT_COL: &str = "amount";
+
 const TYPE_POS: usize = 0;
 pub const CLIENT_POS: usize = 1; // tmp
 const TX_POS: usize = 2;
