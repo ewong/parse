@@ -3,7 +3,6 @@ use clap::Parser;
 pub(crate) mod lib;
 pub(crate) mod models;
 
-use lib::error::AppError;
 use models::processor::Processor;
 
 #[derive(Parser, Debug)]
@@ -13,9 +12,10 @@ struct Args {
     file: String,
 }
 
-fn main() -> Result<(), AppError> {
+fn main() {
     let args = Args::parse();
     let p = Processor::new(&args.file);
-    p.process_csv()?;
-    Ok(())
+    if let Err(err) = p.process_csv() {
+        err.show();
+    }
 }

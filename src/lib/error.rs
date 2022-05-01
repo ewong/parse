@@ -11,6 +11,10 @@ impl AppError {
             message: [path, method, tag, err].join(" | "),
         }
     }
+
+    pub fn show(&self) {
+        println!("{}", self.message);
+    }
 }
 
 impl fmt::Display for AppError {

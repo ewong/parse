@@ -3,13 +3,13 @@ use std::collections::HashMap;
 use std::fs;
 
 use super::tx_cluster_queue::{TxClusterQueue, TxClusterQueueBlock};
-use super::tx_record::{TxRecordReader, CLIENT_POS};
+use super::tx_record::TxRecordReader;
 use super::tx_summary_queue::TxSummaryQueue;
 use crate::lib::error::AppError;
 use crate::lib::timer::Timer;
 use crate::lib::tx_queue::TxQueue;
 
-const PATH: &str = "model/parser";
+const PATH: &str = "model/processor";
 const FN_MERGE_TXNS: &str = "merge_transactions_by_client";
 const OUTPUT_ROOT_DIR: &str = "data";
 const ACCOUNT_DIR: &str = "data/accounts";
@@ -26,12 +26,7 @@ impl<'a> Processor<'a> {
     }
 
     pub fn process_csv(&self) -> Result<(), AppError> {
-        let result = self.cluster_transactions_by_client();
-        if result.is_err() {
-            println!("rollback");
-            return result;
-        }
-
+        self.cluster_transactions_by_client()?;
         let result = self.summarize_transactions_by_client();
         if result.is_err() {
             print!("rollback");
@@ -65,16 +60,16 @@ impl<'a> Processor<'a> {
         let mut block: usize = 0;
         let mut rows: usize = 0;
 
-        while rdr.next_byte_record()? {
-            if map.contains_key(&rdr.byte_record()[CLIENT_POS]) {
-                map.entry(rdr.byte_record()[CLIENT_POS].to_vec())
+        while rdr.next_byte_record() {
+            if map.contains_key(rdr.byte_record_client_utf8()) {
+                map.entry(rdr.byte_record_client_utf8().to_vec())
                     .and_modify(|e| {
                         e.push(rdr.byte_record().clone());
                     });
             } else {
                 let mut v = Vec::new();
                 v.push(rdr.byte_record().clone());
-                map.insert(rdr.byte_record()[CLIENT_POS].to_vec(), v);
+                map.insert(rdr.byte_record_client_utf8().to_vec(), v);
             }
 
             rows += 1;
@@ -95,6 +90,20 @@ impl<'a> Processor<'a> {
 
                 block_timer = Timer::start();
             }
+        }
+
+        // handle rollback
+        if let Some(error) = rdr.error() {
+            let _ = q.stop();
+            timer.stop();
+            let dir_path = self.file_dir()?; // in_dir is the out_dir of cluster_transactions_by_client
+            let _ = fs::remove_dir_all(dir_path);
+            return Err(AppError::new(
+                PATH,
+                "cluster_transactions_by_client",
+                "00",
+                error,
+            ));
         }
 
         // send remaining data to write queue

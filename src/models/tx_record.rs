@@ -1,4 +1,4 @@
-use csv::{ByteRecord, Reader, Writer};
+use csv::{ByteRecord, Error, Reader, Writer};
 use serde::{Deserialize, Serialize};
 use std::fs::{self, File};
 use std::str;
@@ -7,14 +7,12 @@ use crate::lib::error::AppError;
 
 const PATH: &str = "models/tx_record";
 
+const CLIENT_POS: usize = 1;
+
 const TYPE_COL: &str = "type";
 const CLIENT_COL: &str = "client";
 const TX_COL: &str = "tx";
 const AMOUNT_COL: &str = "amount";
-
-pub const CLIENT_POS: usize = 1;
-const TX_POS: usize = 2;
-const AMOUNT_POS: usize = 3;
 
 const FN_NEW: &str = "new";
 const FN_NEXT: &str = "next";
@@ -38,11 +36,11 @@ enum TxRecordType {
 }
 
 impl TxRecordType {
-    pub fn byte_position() -> usize {
+    fn byte_position() -> usize {
         0
     }
 
-    pub fn from_binary(binary: &[u8]) -> Self {
+    fn from_binary(binary: &[u8]) -> Self {
         let initial_type = match binary {
             B_DEPOSIT => TxRecordType::DEPOSIT,
             B_WITHDRAW => TxRecordType::WITHDRAW,
@@ -72,7 +70,11 @@ impl TxRecordType {
         TxRecordType::NONE
     }
 
-    pub fn as_binary(&self) -> &[u8] {
+    fn conflict_type(&self) -> bool {
+        *self == Self::DISPUTE || *self == Self::RESOLVE || *self == Self::CHARGEBACK
+    }
+
+    fn as_binary(&self) -> &[u8] {
         match self {
             DEPOSIT => B_DEPOSIT,
             WITHDRAW => B_WITHDRAW,
@@ -110,7 +112,9 @@ impl<'a> TxRecord<'a> {
 pub struct TxRecordReader {
     reader: Reader<File>,
     headers: ByteRecord,
+    byte_record_type: TxRecordType,
     byte_record: ByteRecord,
+    error: Option<String>,
 }
 
 impl TxRecordReader {
@@ -124,6 +128,8 @@ impl TxRecordReader {
             reader,
             headers,
             byte_record: ByteRecord::new(),
+            error: None,
+            byte_record_type: TxRecordType::NONE,
         })
     }
 
@@ -132,40 +138,57 @@ impl TxRecordReader {
         Ok(())
     }
 
+    pub fn byte_record_conflict_type(&self) -> bool {
+        self.byte_record_type.conflict_type()
+    }
+
     pub fn byte_record(&self) -> &ByteRecord {
         &self.byte_record
     }
 
-    pub fn next_byte_record(&mut self) -> Result<bool, AppError> {
-        self.reader
-            .read_byte_record(&mut self.byte_record)
-            .map_err(|e| AppError::new(PATH, FN_NEXT, "00", &e.to_string()))?;
+    pub fn error(&self) -> &Option<String> {
+        &self.error
+    }
+
+    pub fn byte_record_client_utf8(&self) -> &[u8] {
+        &self.byte_record[CLIENT_POS]
+    }
+
+    pub fn next_byte_record(&mut self) -> bool {
+        let result = self.reader.read_byte_record(&mut self.byte_record);
+        if result.is_err() {
+            let e = result.err().unwrap();
+            self.error = Some(e.to_string());
+            return false;
+        }
 
         if self.byte_record.len() == 0 {
             // end of file
-            return Ok(false);
+            return false;
         }
+
+        // todo: trap for blank lines
 
         // validate
         let tx_record_type =
             TxRecordType::from_binary(&self.byte_record[TxRecordType::byte_position()]);
         if tx_record_type == TxRecordType::NONE {
-            return Err(AppError::new(
-                PATH,
-                FN_NEXT,
-                "01",
-                "invalid transaction record type",
-            ));
+            self.error = Some("invalid transaction record type".to_string());
+            return false;
         }
 
-        let _ = self
+        let result: Result<TxRecord, Error> = self
             .byte_record
-            .deserialize(Some(&self.headers))
-            .map_err(|e| {
-                println!("{}", &e.to_string());
-                AppError::new(PATH, FN_NEXT, "04", &e.to_string())
-            })?;
-        Ok(true)
+            .deserialize::<TxRecord>(Some(&self.headers));
+
+        if result.is_err() {
+            let e = result.err().unwrap();
+            self.error = Some(e.to_string());
+            return false;
+        }
+
+        self.byte_record_type = tx_record_type;
+        true
     }
 
     pub fn next_tx_record(&mut self, tx_record: &mut TxRecord) -> Result<bool, AppError> {
@@ -177,6 +200,7 @@ impl TxRecordReader {
             // end of file
             return Ok(false);
         }
+        // todo: trap for blank lines
 
         // add validation
         let tx_record_type =
