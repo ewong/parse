@@ -3,7 +3,7 @@ use std::sync::{Arc, Mutex, MutexGuard};
 use std::thread;
 use std::time::Duration;
 
-use crate::models::error::AppError;
+use crate::lib::error::AppError;
 
 const PATH: &str = "model/queue";
 const MTX_NUM_TRIES: u8 = 3;

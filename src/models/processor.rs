@@ -2,12 +2,12 @@ use csv::ByteRecord;
 use std::collections::HashMap;
 use std::fs;
 
-use super::error::AppError;
 use super::timer::Timer;
 use super::tx_group_queue::{TxGroupQueue, TxGroupQueueBlock};
+use super::tx_record::CLIENT_POS;
 use super::tx_zip_queue::TxZipQueue;
-use crate::traits::tx_queue::TxQueue;
-use crate::traits::tx_row::CLIENT_POS;
+use crate::lib::error::AppError;
+use crate::lib::tx_queue::TxQueue;
 
 const PATH: &str = "model/parser";
 const FN_PROCESS_CSV: &str = "group_transactions_by_client";
@@ -114,12 +114,16 @@ impl<'a> Processor<'a> {
 
         // send remaining data to write queue
         if map.len() > 0 {
+            if block > 0 {
+                block += 1;
+            }
+
             println!(
                 "send remaining data to write queue --> block: {}, num clients: {}",
-                block + 1,
+                block,
                 map.len()
             );
-            q.add(TxGroupQueueBlock::new(block + 1, map))?;
+            q.add(TxGroupQueueBlock::new(block, map))?;
         }
 
         q.stop()?;

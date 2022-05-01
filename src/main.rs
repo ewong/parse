@@ -1,9 +1,10 @@
 use clap::Parser;
 
+pub(crate) mod lib;
 pub(crate) mod models;
-pub(crate) mod traits;
 
-use models::{error::AppError, processor::Processor};
+use lib::error::AppError;
+use models::processor::Processor;
 
 #[derive(Parser, Debug)]
 #[clap(author, version, about, long_about = None)]

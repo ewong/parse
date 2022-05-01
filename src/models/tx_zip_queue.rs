@@ -5,10 +5,10 @@ use std::fs;
 use std::path::Path;
 use std::sync::{Arc, Mutex};
 
-use super::error::AppError;
 use super::timer::Timer;
-use super::tx_zip_row::TxZipInputRow;
-use crate::traits::tx_queue::TxQueue;
+use super::tx_record::TxRecord;
+use crate::lib::error::AppError;
+use crate::lib::tx_queue::TxQueue;
 
 const PATH: &str = "model/client_queue";
 const FN_PROCESS_ENTRY: &str = "process_entry";
@@ -99,7 +99,7 @@ where
 
         let mut count = 0.0;
         let mut record = ByteRecord::new();
-        let mut tx_row = TxZipInputRow::new();
+        let mut tx_row = TxRecord::new();
 
         for path in file_paths {
             let f = fs::File::open(&path)
@@ -130,7 +130,7 @@ where
                 //     );
                 // }
 
-                let row: TxZipInputRow = record.deserialize(Some(&headers)).map_err(|e| {
+                let row: TxRecord = record.deserialize(Some(&headers)).map_err(|e| {
                     println!("{}", &e.to_string());
                     AppError::new(PATH, FN_PROCESS_ENTRY, "04", &e.to_string())
                 })?;
