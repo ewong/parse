@@ -7,7 +7,7 @@ use std::sync::{Arc, Mutex};
 
 use super::tx_record::TxRecord;
 use crate::lib::error::AppError;
-use crate::lib::timer::Timer;
+// use crate::lib::timer::Timer;
 use crate::lib::tx_queue::TxQueue;
 
 const PATH: &str = "model/client_queue";
@@ -80,7 +80,7 @@ where
     }
 
     fn process_entry(out_dir: &str, entry: &T) -> Result<(), AppError> {
-        let timer = Timer::start();
+        // let timer = Timer::start();
         let paths = fs::read_dir(entry)
             .map_err(|e| AppError::new(PATH, FN_PROCESS_ENTRY, "00", &e.to_string()))?;
 
@@ -148,7 +148,7 @@ where
         }
 
         println!("client {:?}, out_dir: {}", tx_row, out_dir);
-        timer.stop();
+        // timer.stop();
         Ok(())
     }
 }

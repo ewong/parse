@@ -1,13 +1,12 @@
 use std::fs;
 
-use super::tx_cluster::TxCluster;
+use super::tx_cluster::{TxCluster, TxClusterData};
 use super::tx_cluster_queue::TxClusterQueue;
 use super::tx_record::TxRecordReader;
 use super::tx_summary_queue::TxSummaryQueue;
 use crate::lib::error::AppError;
 use crate::lib::timer::Timer;
 use crate::lib::tx_queue::TxQueue;
-use crate::models::tx_cluster::TxClusterData;
 
 const PATH: &str = "model/processor";
 const FN_MERGE_TXNS: &str = "merge_transactions_by_client";
@@ -26,13 +25,13 @@ impl<'a> Processor<'a> {
     }
 
     pub fn process_csv(&self) -> Result<(), AppError> {
-        self.cluster_transactions_by_client()?;
-        let result = self.summarize_transactions_by_client();
-        if result.is_err() {
-            print!("rollback");
-            return result;
-        }
-
+        let timer = Timer::start();
+        let working_dir = self.file_dir()?;
+        self.cluster_transactions_by_client(&working_dir)?;
+        self.summarize_transactions_by_client(&working_dir)?;
+        println!("removing working directory");
+        let _ = fs::remove_dir_all(working_dir);
+        timer.stop();
         Ok(())
     }
 
@@ -48,20 +47,19 @@ impl<'a> Processor<'a> {
         Err(AppError::new(PATH, "file_dir", "01", "invalid file path"))
     }
 
-    fn cluster_transactions_by_client(&self) -> Result<(), AppError> {
-        let timer = Timer::start();
+    fn cluster_transactions_by_client(&self, working_dir: &str) -> Result<(), AppError> {
+        // let timer = Timer::start();
 
         let mut tx_cluster = TxCluster::new(0);
         let mut rdr = TxRecordReader::new(self.file_path)?;
-        let out_dir = self.file_dir()?;
-        let mut q = TxClusterQueue::new(&out_dir);
-        let mut block_timer = Timer::start();
+        let mut q = TxClusterQueue::new(working_dir);
+        // let mut block_timer = Timer::start();
 
         q.start()?;
         let mut block: usize = 0;
         let mut rows: usize = 0;
 
-        while rdr.next_byte_record() {
+        while rdr.next_record() {
             tx_cluster.add(
                 rdr.byte_record_client(),
                 rdr.byte_record_tx(),
@@ -84,18 +82,17 @@ impl<'a> Processor<'a> {
                 block += 1;
                 q.add(tx_cluster)?;
                 tx_cluster = TxCluster::new(block);
-                block_timer.stop();
+                // block_timer.stop();
                 println!("----------------------------------------------------");
 
-                block_timer = Timer::start();
+                // block_timer = Timer::start();
             }
         }
 
         // handle rollback
         if let Some(error) = rdr.error() {
             let _ = q.stop();
-            timer.stop();
-            let _ = fs::remove_dir_all(out_dir);
+            let _ = fs::remove_dir_all(working_dir);
             return Err(AppError::new(
                 PATH,
                 "cluster_transactions_by_client",
@@ -119,15 +116,13 @@ impl<'a> Processor<'a> {
         }
 
         q.stop()?;
-        timer.stop();
+        // timer.stop();
         Ok(())
     }
 
-    fn summarize_transactions_by_client(&self) -> Result<(), AppError> {
-        let timer = Timer::start();
-        let in_dir = self.file_dir()?; // in_dir is the out_dir of cluster_transactions_by_client
-
-        let paths = fs::read_dir(&in_dir)
+    fn summarize_transactions_by_client(&self, working_dir: &str) -> Result<(), AppError> {
+        // let timer = Timer::start();
+        let paths = fs::read_dir(working_dir)
             .map_err(|e| AppError::new(PATH, FN_MERGE_TXNS, "00", &e.to_string()))?;
 
         let dir_paths: Vec<String> = paths
@@ -145,7 +140,7 @@ impl<'a> Processor<'a> {
         let mut q = TxSummaryQueue::new(ACCOUNT_DIR, dir_paths);
         q.start()?;
         q.stop()?;
-        timer.stop();
+        // timer.stop();
         Ok(())
     }
 }

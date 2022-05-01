@@ -4,7 +4,7 @@ use std::sync::{Arc, Mutex};
 use super::tx_cluster::TxClusterData;
 use super::tx_record::TxRecordWriter;
 use crate::lib::error::AppError;
-use crate::lib::timer::Timer;
+// use crate::lib::timer::Timer;
 use crate::lib::tx_queue::TxQueue;
 
 // const PATH: &str = "model/write_queue";
@@ -82,16 +82,6 @@ where
         let mut wtr_opt: Option<TxRecordWriter> = None;
 
         for (client_id, records) in entry.client_txns() {
-            // if entry.client_conflicts().contains_key(client_id) {
-            //     println!(
-            //         "client {}, conflicts found --> {:?}",
-            //         client_id,
-            //         entry.client_conflicts().get(client_id).unwrap()
-            //     );
-            // }
-
-            let timer = Timer::start();
-
             let dir_path = [out_dir, "/", &client_id.to_string()].join("");
             let file_name = &entry.block().to_string();
 
@@ -102,59 +92,13 @@ where
             if let Some(wtr) = &mut wtr_opt {
                 wtr.set_writer(&dir_path, &file_name)?;
                 wtr.write_records(records)?;
+                if let Some(set) = entry.client_conflicts().get(client_id) {
+                    let conflict_dir = [out_dir, &client_id.to_string(), "conflicts"].join("/");
+                    wtr.write_conflicted_tx_ids(&conflict_dir, &file_name, set)?;
+                }
             }
-
-            timer.stop();
         }
 
         Ok(())
     }
 }
-
-// for (k, v) in entry.map() {
-//     let timer = Timer::start();
-
-//     let client_id_str = String::from_utf8(k.to_vec())
-//         .map_err(|e| AppError::new(PATH, FN_PROCESS_ENTRY, "00", &e.to_string()))?;
-
-//     let dir_path = [out_dir, &client_id_str].join(CLIENT_PARTITION);
-//     println!("dir_path: {}", dir_path);
-//     fs::create_dir_all(&dir_path)
-//         .map_err(|e| AppError::new(PATH, FN_PROCESS_ENTRY, "01", &e.to_string()))?;
-
-//     let file_path = [
-//         &dir_path,
-//         CLIENT_PARTITION,
-//         &client_id_str,
-//         BLOCK_PARTITION,
-//         &entry.block().to_string(),
-//         WORKER_PARTITION,
-//         &wid.to_string(),
-//         ".csv",
-//     ]
-//     .join("");
-
-//     let mut wtr = csv::Writer::from_path(&file_path)
-//         .map_err(|e| AppError::new(PATH, FN_PROCESS_ENTRY, "02", &e.to_string()))?;
-//     wtr.write_byte_record(&ByteRecord::from(
-//         &[TYPE_COL, CLIENT_COL, TX_COL, AMOUNT_COL][..],
-//     ))
-//     .map_err(|e| AppError::new(PATH, FN_PROCESS_ENTRY, "03", &e.to_string()))?;
-
-//     let mut rows = 0;
-//     for record in v {
-//         wtr.write_byte_record(record)
-//             .map_err(|e| AppError::new(PATH, FN_PROCESS_ENTRY, "04", &e.to_string()))?;
-//         rows += 1;
-//     }
-//     wtr.flush()
-//         .map_err(|e| AppError::new(PATH, FN_PROCESS_ENTRY, "05", &e.to_string()))?;
-//     println!(
-//         "worker {} wrote --> block: {}, client: {:?}, num rows: {}",
-//         wid,
-//         entry.block(),
-//         client_id_str,
-//         rows
-//     );
-//     timer.stop();
-// }

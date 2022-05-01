@@ -1,6 +1,8 @@
 use csv::{ByteRecord, Reader, Writer};
 use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
 use std::fs::{self, File};
+use std::io::Write;
 use std::str;
 
 use crate::lib::error::AppError;
@@ -16,7 +18,6 @@ const TX_COL: &str = "tx";
 const AMOUNT_COL: &str = "amount";
 
 const FN_NEW: &str = "new";
-const FN_NEXT_TX: &str = "next_tx_record";
 const FN_WRITE_RECORDS: &str = "writer_records";
 
 const B_DEPOSIT: &[u8] = b"deposit";
@@ -153,7 +154,7 @@ impl TxRecordReader {
         &self.byte_record_tx
     }
 
-    pub fn next_byte_record(&mut self) -> bool {
+    pub fn next_record(&mut self) -> bool {
         let result = self.reader.read_byte_record(&mut self.byte_record);
         if result.is_err() {
             let e = result.err().unwrap();
@@ -197,42 +198,9 @@ impl TxRecordReader {
         true
     }
 
-    pub fn next_tx_record(&mut self, tx_record: &mut TxRecord) -> Result<bool, AppError> {
-        self.reader
-            .read_byte_record(&mut self.byte_record)
-            .map_err(|e| AppError::new(PATH, FN_NEXT_TX, "00", &e.to_string()))?;
-
-        if self.byte_record.len() == 0 {
-            // end of file
-            return Ok(false);
-        }
-        // todo: trap for blank lines
-
-        // add validation
-        let tx_record_type = TxRecordType::from_binary(&self.byte_record[TYPE_POS]);
-        if tx_record_type == TxRecordType::NONE {
-            return Err(AppError::new(
-                PATH,
-                FN_NEXT_TX,
-                "01",
-                "invalid transaction record type",
-            ));
-        }
-
-        let tx_record = self
-            .byte_record
-            .deserialize(Some(&self.headers))
-            .map_err(|e| {
-                println!("{}", &e.to_string());
-                AppError::new(PATH, FN_NEXT_TX, "04", &e.to_string())
-            })?;
-
-        Ok(true)
-    }
-
     fn csv_reader(csv_path: &str) -> Result<Reader<File>, AppError> {
         let f = fs::File::open(&csv_path)
-            .map_err(|e| AppError::new(PATH, FN_NEW, "00", &e.to_string()))?;
+            .map_err(|e| AppError::new(PATH, "csv_reader", "00", &e.to_string()))?;
         Ok(csv::Reader::from_reader(f))
     }
 }
@@ -276,9 +244,26 @@ impl TxRecordWriter {
         Ok(())
     }
 
+    pub fn write_conflicted_tx_ids(
+        &self,
+        dir_path: &str,
+        file_name: &str,
+        set: &HashSet<u32>,
+    ) -> Result<(), AppError> {
+        if set.is_empty() {
+            return Ok(());
+        }
+        let path = Self::file_path(dir_path, file_name)?;
+        let mut output = fs::File::create(path)
+            .map_err(|e| AppError::new(PATH, "write_conflicted_tx_ids", "00", &e.to_string()))?;
+        write!(output, "{:?}", set)
+            .map_err(|e| AppError::new(PATH, "write_conflicted_tx_ids", "01", &e.to_string()))?;
+        Ok(())
+    }
+
     fn file_path(dir_path: &str, file_name: &str) -> Result<String, AppError> {
         fs::create_dir_all(dir_path)
-            .map_err(|e| AppError::new(PATH, FN_NEW, "00", &e.to_string()))?;
+            .map_err(|e| AppError::new(PATH, "file_path", "00", &e.to_string()))?;
         Ok([dir_path, "/", file_name, ".csv"].join(""))
     }
 }
