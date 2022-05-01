@@ -1,14 +1,14 @@
 use crossbeam_channel::Receiver;
 use csv::ByteRecord;
-use serde::{Deserialize, Serialize};
 use std::fmt::{Debug, Display};
 use std::fs;
 use std::path::Path;
 use std::sync::{Arc, Mutex};
 
 use super::error::AppError;
-use super::queue::Queue;
 use super::timer::Timer;
+use super::tx_merge_row::TxMergeInputRow;
+use super::tx_queue::TxQueue;
 
 const PATH: &str = "model/client_queue";
 const FN_PROCESS_ENTRY: &str = "process_entry";
@@ -16,30 +16,7 @@ const FN_PROCESS_ENTRY: &str = "process_entry";
 const NUM_THREADS: u16 = 64;
 const THREAD_SLEEP_DURATION: u64 = 100;
 
-#[derive(Debug, Deserialize, Serialize, Clone)]
-struct TxRow<'a> {
-    #[serde(rename(deserialize = "type", serialize = "type"))]
-    type_id: &'a [u8],
-    #[serde(rename(deserialize = "client", serialize = "client"))]
-    client_id: u16,
-    #[serde(rename(deserialize = "tx", serialize = "tx"))]
-    tx_id: f32,
-    #[serde(rename(deserialize = "amount", serialize = "amount"))]
-    amount: Option<f64>,
-}
-
-impl<'a> TxRow<'a> {
-    fn new() -> Self {
-        Self {
-            type_id: b"",
-            client_id: 0,
-            tx_id: 0.0,
-            amount: None,
-        }
-    }
-}
-
-pub struct ClientQueue<T> {
+pub struct TxMergeQueue<T> {
     started: bool,
     rx: Option<Receiver<bool>>,
     out_dir: String,
@@ -47,7 +24,7 @@ pub struct ClientQueue<T> {
     arc_q: Arc<Mutex<Vec<T>>>,
 }
 
-impl<T> ClientQueue<T>
+impl<T> TxMergeQueue<T>
 where
     T: Send + Sync + Display + Debug + AsRef<Path> + 'static,
 {
@@ -62,7 +39,7 @@ where
     }
 }
 
-impl<T> Queue<T> for ClientQueue<T>
+impl<T> TxQueue<T> for TxMergeQueue<T>
 where
     T: Send + Sync + Display + Debug + AsRef<Path> + 'static,
 {
@@ -122,7 +99,7 @@ where
 
         let mut count = 0.0;
         let mut record = ByteRecord::new();
-        let mut tx_row = TxRow::new();
+        let mut tx_row = TxMergeInputRow::new();
 
         for path in file_paths {
             let f = fs::File::open(&path)
@@ -153,7 +130,7 @@ where
                 //     );
                 // }
 
-                let row: TxRow = record
+                let row: TxMergeInputRow = record
                     .deserialize(Some(&headers))
                     .map_err(|e| AppError::new(PATH, FN_PROCESS_ENTRY, "04", &e.to_string()))?;
                 // if fail => write user id in tx_error.csv
