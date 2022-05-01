@@ -19,7 +19,7 @@ pub trait TxQueue<T: Send + Sync + 'static> {
     fn rx(&self) -> &Option<Receiver<bool>>;
     fn set_rx(&mut self, rx: Option<Receiver<bool>>);
     fn out_dir(&self) -> &str;
-    fn process_entry(out_dir: &str, entry: &T, wid: u16) -> Result<(), AppError>;
+    fn process_entry(out_dir: &str, entry: &T) -> Result<(), AppError>;
 
     fn start(&mut self) -> Result<(), AppError> {
         if self.is_shutdown()? {
@@ -125,7 +125,7 @@ pub trait TxQueue<T: Send + Sync + 'static> {
                 if let Some(entry) = q.pop() {
                     drop(q);
                     drop(mgq);
-                    let _ = Self::process_entry(&out_dir_path, &entry, wid);
+                    let _ = Self::process_entry(&out_dir_path, &entry);
                 }
 
                 // sleep

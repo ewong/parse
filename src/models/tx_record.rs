@@ -15,7 +15,7 @@ const TX_COL: &str = "tx";
 const AMOUNT_COL: &str = "amount";
 
 const FN_NEW: &str = "new";
-const FN_NEXT: &str = "next";
+const FN_NEXT_TX: &str = "next_tx_record";
 const FN_WRITE_RECORDS: &str = "writer_records";
 
 const B_DEPOSIT: &[u8] = b"deposit";
@@ -112,6 +112,7 @@ impl<'a> TxRecord<'a> {
 pub struct TxRecordReader {
     reader: Reader<File>,
     headers: ByteRecord,
+
     byte_record_type: TxRecordType,
     byte_record: ByteRecord,
     error: Option<String>,
@@ -194,7 +195,7 @@ impl TxRecordReader {
     pub fn next_tx_record(&mut self, tx_record: &mut TxRecord) -> Result<bool, AppError> {
         self.reader
             .read_byte_record(&mut self.byte_record)
-            .map_err(|e| AppError::new(PATH, FN_NEXT, "00", &e.to_string()))?;
+            .map_err(|e| AppError::new(PATH, FN_NEXT_TX, "00", &e.to_string()))?;
 
         if self.byte_record.len() == 0 {
             // end of file
@@ -208,7 +209,7 @@ impl TxRecordReader {
         if tx_record_type == TxRecordType::NONE {
             return Err(AppError::new(
                 PATH,
-                FN_NEXT,
+                FN_NEXT_TX,
                 "01",
                 "invalid transaction record type",
             ));
@@ -219,7 +220,7 @@ impl TxRecordReader {
             .deserialize(Some(&self.headers))
             .map_err(|e| {
                 println!("{}", &e.to_string());
-                AppError::new(PATH, FN_NEXT, "04", &e.to_string())
+                AppError::new(PATH, FN_NEXT_TX, "04", &e.to_string())
             })?;
 
         Ok(true)

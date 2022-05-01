@@ -79,7 +79,7 @@ where
         &self.out_dir
     }
 
-    fn process_entry(out_dir: &str, entry: &T, wid: u16) -> Result<(), AppError> {
+    fn process_entry(out_dir: &str, entry: &T) -> Result<(), AppError> {
         let timer = Timer::start();
         let paths = fs::read_dir(entry)
             .map_err(|e| AppError::new(PATH, FN_PROCESS_ENTRY, "00", &e.to_string()))?;
@@ -147,10 +147,7 @@ where
             tx_row.tx_id = tx_row.tx_id / count;
         }
 
-        println!(
-            "worker {} wrote --> client {:?}, out_dir: {}",
-            wid, tx_row, out_dir
-        );
+        println!("client {:?}, out_dir: {}", tx_row, out_dir);
         timer.stop();
         Ok(())
     }

@@ -8,7 +8,7 @@ pub struct AppError {
 impl AppError {
     pub fn new(path: &str, method: &str, tag: &str, err: &str) -> Self {
         AppError {
-            message: [path, method, tag, err].join(" | "),
+            message: [&chrono::Utc::now().to_string(), path, method, tag, err].join(" | "),
         }
     }
 

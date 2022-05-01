@@ -11,9 +11,6 @@ use crate::lib::tx_queue::TxQueue;
 const PATH: &str = "model/write_queue";
 const FN_PROCESS_ENTRY: &str = "process_entry";
 
-const CLIENT_PARTITION: &str = "client_";
-const BLOCK_PARTITION: &str = "_block_";
-
 const NUM_THREADS: u16 = 3;
 const THREAD_SLEEP_DURATION: u64 = 500;
 
@@ -108,7 +105,7 @@ where
         &self.out_dir
     }
 
-    fn process_entry(out_dir: &str, entry: &T, wid: u16) -> Result<(), AppError> {
+    fn process_entry(out_dir: &str, entry: &T) -> Result<(), AppError> {
         let mut wtr_opt: Option<TxRecordWriter> = None;
 
         for (client_id, records) in entry.map() {
@@ -117,8 +114,8 @@ where
             let client_id_str = String::from_utf8(client_id.to_vec())
                 .map_err(|e| AppError::new(PATH, FN_PROCESS_ENTRY, "00", &e.to_string()))?;
 
-            let dir_path = [out_dir, "/", CLIENT_PARTITION, &client_id_str].join("");
-            let file_name = [BLOCK_PARTITION, &entry.block().to_string()].join("");
+            let dir_path = [out_dir, "/", &client_id_str].join("");
+            let file_name = &entry.block().to_string();
 
             if wtr_opt.is_none() {
                 wtr_opt = Some(TxRecordWriter::new(&dir_path, &file_name)?);
@@ -127,8 +124,6 @@ where
             if let Some(wtr) = &mut wtr_opt {
                 wtr.set_writer(&dir_path, &file_name)?;
                 wtr.write_records(records)?;
-            } else {
-                println!("")
             }
 
             timer.stop();
