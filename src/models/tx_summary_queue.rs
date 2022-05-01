@@ -97,7 +97,7 @@ where
             .collect();
         file_paths.sort_by(|a, b| a.cmp(b));
 
-        let mut count = 0.0;
+        let mut count = 0;
         let mut record = ByteRecord::new();
         let mut tx_row = TxRecord::new();
 
@@ -141,7 +141,7 @@ where
                 }
 
                 tx_row.tx_id += row.tx_id;
-                count += 1.0;
+                count += 1;
             }
 
             tx_row.tx_id = tx_row.tx_id / count;

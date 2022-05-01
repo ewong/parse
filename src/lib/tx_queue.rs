@@ -26,7 +26,6 @@ pub trait TxQueue<T: Send + Sync + 'static> {
             self.set_started(true);
             self.set_shutdown(false)?;
             self.spawn_workers()?;
-            println!("TxQueue has started!");
         }
         Ok(())
     }

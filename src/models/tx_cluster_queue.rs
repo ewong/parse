@@ -1,44 +1,17 @@
 use crossbeam_channel::Receiver;
-use csv::ByteRecord;
-use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
+use super::tx_cluster::TxClusterData;
 use super::tx_record::TxRecordWriter;
 use crate::lib::error::AppError;
 use crate::lib::timer::Timer;
 use crate::lib::tx_queue::TxQueue;
 
-const PATH: &str = "model/write_queue";
-const FN_PROCESS_ENTRY: &str = "process_entry";
+// const PATH: &str = "model/write_queue";
+// const FN_PROCESS_ENTRY: &str = "process_entry";
 
 const NUM_THREADS: u16 = 3;
 const THREAD_SLEEP_DURATION: u64 = 500;
-
-pub trait TxClusterQueueEntry: Send + Sync + 'static {
-    fn block(&self) -> usize;
-    fn map(&self) -> &HashMap<Vec<u8>, Vec<ByteRecord>>;
-}
-
-pub struct TxClusterQueueBlock {
-    block: usize,
-    map: HashMap<Vec<u8>, Vec<ByteRecord>>,
-}
-
-impl TxClusterQueueBlock {
-    pub fn new(block: usize, map: HashMap<Vec<u8>, Vec<ByteRecord>>) -> Self {
-        Self { block, map }
-    }
-}
-
-impl TxClusterQueueEntry for TxClusterQueueBlock {
-    fn block(&self) -> usize {
-        self.block
-    }
-
-    fn map(&self) -> &HashMap<Vec<u8>, Vec<ByteRecord>> {
-        &self.map
-    }
-}
 
 pub struct TxClusterQueue<E> {
     started: bool,
@@ -50,7 +23,7 @@ pub struct TxClusterQueue<E> {
 
 impl<E> TxClusterQueue<E>
 where
-    E: TxClusterQueueEntry,
+    E: TxClusterData,
 {
     pub fn new(out_dir: &str) -> Self {
         Self {
@@ -65,7 +38,7 @@ where
 
 impl<T> TxQueue<T> for TxClusterQueue<T>
 where
-    T: TxClusterQueueEntry,
+    T: TxClusterData,
 {
     fn num_threads() -> u16 {
         NUM_THREADS
@@ -108,13 +81,18 @@ where
     fn process_entry(out_dir: &str, entry: &T) -> Result<(), AppError> {
         let mut wtr_opt: Option<TxRecordWriter> = None;
 
-        for (client_id, records) in entry.map() {
+        for (client_id, records) in entry.tx_map() {
+            // if entry.conflict_map().contains_key(client_id) {
+            //     println!(
+            //         "client {}, conflicts found --> {:?}",
+            //         client_id,
+            //         entry.conflict_map().get(client_id).unwrap()
+            //     );
+            // }
+
             let timer = Timer::start();
 
-            let client_id_str = String::from_utf8(client_id.to_vec())
-                .map_err(|e| AppError::new(PATH, FN_PROCESS_ENTRY, "00", &e.to_string()))?;
-
-            let dir_path = [out_dir, "/", &client_id_str].join("");
+            let dir_path = [out_dir, "/", &client_id.to_string()].join("");
             let file_name = &entry.block().to_string();
 
             if wtr_opt.is_none() {

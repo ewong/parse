@@ -1,13 +1,13 @@
-use csv::ByteRecord;
-use std::collections::HashMap;
 use std::fs;
 
-use super::tx_cluster_queue::{TxClusterQueue, TxClusterQueueBlock};
+use super::tx_cluster::TxCluster;
+use super::tx_cluster_queue::TxClusterQueue;
 use super::tx_record::TxRecordReader;
 use super::tx_summary_queue::TxSummaryQueue;
 use crate::lib::error::AppError;
 use crate::lib::timer::Timer;
 use crate::lib::tx_queue::TxQueue;
+use crate::models::tx_cluster::TxClusterData;
 
 const PATH: &str = "model/processor";
 const FN_MERGE_TXNS: &str = "merge_transactions_by_client";
@@ -51,9 +51,10 @@ impl<'a> Processor<'a> {
     fn cluster_transactions_by_client(&self) -> Result<(), AppError> {
         let timer = Timer::start();
 
-        let mut map: HashMap<Vec<u8>, Vec<ByteRecord>> = HashMap::new();
+        let mut tx_cluster = TxCluster::new(0);
         let mut rdr = TxRecordReader::new(self.file_path)?;
-        let mut q = TxClusterQueue::new(&self.file_dir()?);
+        let out_dir = self.file_dir()?;
+        let mut q = TxClusterQueue::new(&out_dir);
         let mut block_timer = Timer::start();
 
         q.start()?;
@@ -61,16 +62,8 @@ impl<'a> Processor<'a> {
         let mut rows: usize = 0;
 
         while rdr.next_byte_record() {
-            if map.contains_key(rdr.byte_record_client_utf8()) {
-                map.entry(rdr.byte_record_client_utf8().to_vec())
-                    .and_modify(|e| {
-                        e.push(rdr.byte_record().clone());
-                    });
-            } else {
-                let mut v = Vec::new();
-                v.push(rdr.byte_record().clone());
-                map.insert(rdr.byte_record_client_utf8().to_vec(), v);
-            }
+            tx_cluster.add_tx(rdr.byte_record_client(), rdr.byte_record());
+            tx_cluster.add_conflict(rdr.byte_record_client(), rdr.byte_record_tx());
 
             rows += 1;
             if rows == BLOCK_SIZE {
@@ -78,13 +71,16 @@ impl<'a> Processor<'a> {
                     println!("----------------------------------------------------");
                 }
 
-                println!("add to q --> block: {}, num clients: {}", block, map.len());
-                q.add(TxClusterQueueBlock::new(block, map))?;
-                map = HashMap::new();
+                println!(
+                    "add to q --> block: {}, num clients: {}",
+                    block,
+                    tx_cluster.tx_map().len()
+                );
 
                 rows = 0;
                 block += 1;
-
+                q.add(tx_cluster)?;
+                tx_cluster = TxCluster::new(block);
                 block_timer.stop();
                 println!("----------------------------------------------------");
 
@@ -96,8 +92,7 @@ impl<'a> Processor<'a> {
         if let Some(error) = rdr.error() {
             let _ = q.stop();
             timer.stop();
-            let dir_path = self.file_dir()?; // in_dir is the out_dir of cluster_transactions_by_client
-            let _ = fs::remove_dir_all(dir_path);
+            let _ = fs::remove_dir_all(out_dir);
             return Err(AppError::new(
                 PATH,
                 "cluster_transactions_by_client",
@@ -107,7 +102,7 @@ impl<'a> Processor<'a> {
         }
 
         // send remaining data to write queue
-        if map.len() > 0 {
+        if tx_cluster.tx_map().len() > 0 {
             if block > 0 {
                 block += 1;
             }
@@ -115,9 +110,9 @@ impl<'a> Processor<'a> {
             println!(
                 "send remaining data to write queue --> block: {}, num clients: {}",
                 block,
-                map.len()
+                tx_cluster.tx_map().len()
             );
-            q.add(TxClusterQueueBlock::new(block, map))?;
+            q.add(tx_cluster)?;
         }
 
         q.stop()?;
@@ -144,7 +139,6 @@ impl<'a> Processor<'a> {
             .filter(|s| s.len() > 0)
             .collect();
 
-        // println!("num clients: {}", dir_paths.len());
         let mut q = TxSummaryQueue::new(ACCOUNT_DIR, dir_paths);
         q.start()?;
         q.stop()?;

@@ -1,4 +1,4 @@
-use csv::{ByteRecord, Error, Reader, Writer};
+use csv::{ByteRecord, Reader, Writer};
 use serde::{Deserialize, Serialize};
 use std::fs::{self, File};
 use std::str;
@@ -7,6 +7,7 @@ use crate::lib::error::AppError;
 
 const PATH: &str = "models/tx_record";
 
+const TYPE_POS: usize = 0;
 const CLIENT_POS: usize = 1;
 
 const TYPE_COL: &str = "type";
@@ -36,10 +37,6 @@ enum TxRecordType {
 }
 
 impl TxRecordType {
-    fn byte_position() -> usize {
-        0
-    }
-
     fn from_binary(binary: &[u8]) -> Self {
         let initial_type = match binary {
             B_DEPOSIT => TxRecordType::DEPOSIT,
@@ -93,7 +90,7 @@ pub struct TxRecord<'a> {
     #[serde(rename(deserialize = "client", serialize = "client"))]
     pub client_id: u16,
     #[serde(rename(deserialize = "tx", serialize = "tx"))]
-    pub tx_id: f32,
+    pub tx_id: u32,
     #[serde(rename(deserialize = "amount", serialize = "amount"))]
     pub amount: Option<f64>,
 }
@@ -103,7 +100,7 @@ impl<'a> TxRecord<'a> {
         Self {
             type_id: b"",
             client_id: 0,
-            tx_id: 0.0,
+            tx_id: 0,
             amount: None,
         }
     }
@@ -112,8 +109,8 @@ impl<'a> TxRecord<'a> {
 pub struct TxRecordReader {
     reader: Reader<File>,
     headers: ByteRecord,
-
-    byte_record_type: TxRecordType,
+    pub byte_record_client: u16,
+    pub byte_record_tx: Option<u32>,
     byte_record: ByteRecord,
     error: Option<String>,
 }
@@ -128,19 +125,16 @@ impl TxRecordReader {
         Ok(Self {
             reader,
             headers,
+            byte_record_client: 0,
+            byte_record_tx: None,
             byte_record: ByteRecord::new(),
             error: None,
-            byte_record_type: TxRecordType::NONE,
         })
     }
 
     pub fn set_reader(&mut self, csv_path: &str) -> Result<(), AppError> {
         self.reader = Self::csv_reader(csv_path)?;
         Ok(())
-    }
-
-    pub fn byte_record_conflict_type(&self) -> bool {
-        self.byte_record_type.conflict_type()
     }
 
     pub fn byte_record(&self) -> &ByteRecord {
@@ -151,8 +145,12 @@ impl TxRecordReader {
         &self.error
     }
 
-    pub fn byte_record_client_utf8(&self) -> &[u8] {
-        &self.byte_record[CLIENT_POS]
+    pub fn byte_record_client(&self) -> &u16 {
+        &self.byte_record_client
+    }
+
+    pub fn byte_record_tx(&self) -> &Option<u32> {
+        &self.byte_record_tx
     }
 
     pub fn next_byte_record(&mut self) -> bool {
@@ -171,14 +169,13 @@ impl TxRecordReader {
         // todo: trap for blank lines
 
         // validate
-        let tx_record_type =
-            TxRecordType::from_binary(&self.byte_record[TxRecordType::byte_position()]);
+        let tx_record_type = TxRecordType::from_binary(&self.byte_record[TYPE_POS]);
         if tx_record_type == TxRecordType::NONE {
             self.error = Some("invalid transaction record type".to_string());
             return false;
         }
 
-        let result: Result<TxRecord, Error> = self
+        let result = self
             .byte_record
             .deserialize::<TxRecord>(Some(&self.headers));
 
@@ -188,7 +185,15 @@ impl TxRecordReader {
             return false;
         }
 
-        self.byte_record_type = tx_record_type;
+        let tx_record = result.unwrap();
+        self.byte_record_client = tx_record.client_id;
+
+        if tx_record_type.conflict_type() {
+            self.byte_record_tx = Some(tx_record.tx_id);
+        } else {
+            self.byte_record_tx = None;
+        }
+
         true
     }
 
@@ -204,8 +209,7 @@ impl TxRecordReader {
         // todo: trap for blank lines
 
         // add validation
-        let tx_record_type =
-            TxRecordType::from_binary(&self.byte_record[TxRecordType::byte_position()]);
+        let tx_record_type = TxRecordType::from_binary(&self.byte_record[TYPE_POS]);
         if tx_record_type == TxRecordType::NONE {
             return Err(AppError::new(
                 PATH,
