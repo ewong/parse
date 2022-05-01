@@ -62,8 +62,11 @@ impl<'a> Processor<'a> {
         let mut rows: usize = 0;
 
         while rdr.next_byte_record() {
-            tx_cluster.add_tx(rdr.byte_record_client(), rdr.byte_record());
-            tx_cluster.add_conflict(rdr.byte_record_client(), rdr.byte_record_tx());
+            tx_cluster.add(
+                rdr.byte_record_client(),
+                rdr.byte_record_tx(),
+                rdr.byte_record(),
+            );
 
             rows += 1;
             if rows == BLOCK_SIZE {
@@ -74,7 +77,7 @@ impl<'a> Processor<'a> {
                 println!(
                     "add to q --> block: {}, num clients: {}",
                     block,
-                    tx_cluster.tx_map().len()
+                    tx_cluster.client_txns().len()
                 );
 
                 rows = 0;
@@ -102,7 +105,7 @@ impl<'a> Processor<'a> {
         }
 
         // send remaining data to write queue
-        if tx_cluster.tx_map().len() > 0 {
+        if tx_cluster.client_txns().len() > 0 {
             if block > 0 {
                 block += 1;
             }
@@ -110,7 +113,7 @@ impl<'a> Processor<'a> {
             println!(
                 "send remaining data to write queue --> block: {}, num clients: {}",
                 block,
-                tx_cluster.tx_map().len()
+                tx_cluster.client_txns().len()
             );
             q.add(tx_cluster)?;
         }

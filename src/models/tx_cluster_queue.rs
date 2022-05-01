@@ -81,12 +81,12 @@ where
     fn process_entry(out_dir: &str, entry: &T) -> Result<(), AppError> {
         let mut wtr_opt: Option<TxRecordWriter> = None;
 
-        for (client_id, records) in entry.tx_map() {
-            // if entry.conflict_map().contains_key(client_id) {
+        for (client_id, records) in entry.client_txns() {
+            // if entry.client_conflicts().contains_key(client_id) {
             //     println!(
             //         "client {}, conflicts found --> {:?}",
             //         client_id,
-            //         entry.conflict_map().get(client_id).unwrap()
+            //         entry.client_conflicts().get(client_id).unwrap()
             //     );
             // }
 
