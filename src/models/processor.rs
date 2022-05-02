@@ -10,7 +10,6 @@ use crate::lib::timer::Timer;
 use crate::lib::tx_queue::TxQueue;
 
 const PATH: &str = "model/processor";
-const FN_MERGE_TXNS: &str = "merge_transactions_by_client";
 const OUTPUT_ROOT_DIR: &str = "data";
 const ACCOUNT_DIR: &str = "data/accounts";
 

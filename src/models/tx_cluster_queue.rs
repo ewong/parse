@@ -4,11 +4,7 @@ use std::sync::{Arc, Mutex};
 use super::tx_cluster::TxClusterData;
 use super::tx_record::TxRecordWriter;
 use crate::lib::error::AppError;
-// use crate::lib::timer::Timer;
 use crate::lib::tx_queue::TxQueue;
-
-// const PATH: &str = "model/write_queue";
-// const FN_PROCESS_ENTRY: &str = "process_entry";
 
 const NUM_THREADS: u16 = 3;
 const THREAD_SLEEP_DURATION: u64 = 500;

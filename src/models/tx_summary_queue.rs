@@ -161,6 +161,8 @@ where
             }
         }
 
+        account.show();
+
         Ok(())
     }
 }

@@ -26,7 +26,7 @@ const B_DISPUTE: &[u8] = b"dispute";
 const B_RESOLVE: &[u8] = b"resolve";
 const B_CHARGEBACK: &[u8] = b"chargeback";
 
-#[derive(PartialEq)]
+#[derive(PartialEq, Debug, Clone)]
 pub enum TxRecordType {
     DEPOSIT = 0,
     WITHDRAW,
@@ -93,17 +93,6 @@ pub struct TxRecord<'a> {
     pub tx_id: u32,
     #[serde(rename(deserialize = "amount", serialize = "amount"))]
     pub amount: Option<f64>,
-}
-
-impl<'a> TxRecord<'a> {
-    pub fn new() -> Self {
-        Self {
-            type_id: b"",
-            client_id: 0,
-            tx_id: 0,
-            amount: None,
-        }
-    }
 }
 
 pub struct TxRecordReader {

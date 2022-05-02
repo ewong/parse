@@ -113,7 +113,7 @@ pub trait TxQueue<T: Send + Sync + 'static> {
                     drop(mgq);
                     if let Ok(shutdown) = mtx_shutdown.lock() {
                         if *shutdown {
-                            println!("worker {} is shutdown", wid);
+                            // println!("worker {} is shutdown", wid);
                             tx.send(true).unwrap();
                             return;
                         }
@@ -127,7 +127,7 @@ pub trait TxQueue<T: Send + Sync + 'static> {
                     let result = Self::process_entry(&out_dir_path, &entry);
                     if result.is_err() {
                         // change this so that each worker passes back Result<(), AppError>
-                        println!("worker {} failed. rolling back", wid);
+                        // println!("worker {} failed. rolling back", wid);
                         result.err().unwrap().show();
                         tx.send(true).unwrap();
                         return;
@@ -137,7 +137,7 @@ pub trait TxQueue<T: Send + Sync + 'static> {
                 // sleep
                 thread::sleep(Duration::from_millis(Self::thread_sleep_duration()));
             });
-            println!("spawned worker {}", wid);
+            // println!("spawned worker {}", wid);
         }
 
         Ok(())

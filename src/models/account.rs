@@ -1,16 +1,16 @@
 use serde::{Deserialize, Serialize};
 use std::io::Read;
 use std::{collections::HashMap, fs};
-// use csv::{ByteRecord, Reader, Writer};
-// use std::collections::HashSet;
-// use std::fs::{self, File};
-// use std::str;
-
-use crate::lib::error::AppError;
 
 use super::tx_record::TxRecordType;
+use crate::lib::error::AppError;
 
-const PATH: &str = "models/account";
+#[derive(Debug, Clone)]
+struct TxConflict {
+    state: TxRecordType,
+    tx_type: TxRecordType,
+    amount: f64,
+}
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct Account {
@@ -22,15 +22,13 @@ pub struct Account {
     locked: bool,
 
     #[serde(skip)]
-    tx_conflict_map: Option<HashMap<u32, f64>>,
+    tx_conflict_map: Option<HashMap<u32, TxConflict>>,
 }
 
 impl Account {
     // todo: check to see the client has an existing account
     pub fn new(client_id: u16, tx_dir: &str) -> Result<Self, AppError> {
-        let tx_conflict_map = Self::get_tx_id_conflict_map(tx_dir);
-        println!("tx_conflict_map: {:?}", tx_conflict_map);
-
+        let tx_conflict_map = Self::load_tx_id_conflict_map(tx_dir);
         Ok(Self {
             client_id,
             available: 0.0,
@@ -41,6 +39,13 @@ impl Account {
         })
     }
 
+    pub fn show(&self) {
+        println!(
+            "completed --> client {}, available: {}, held: {}, total: {}, locked: {}",
+            self.client_id, self.available, self.held, self.total, self.locked
+        );
+    }
+
     pub fn handle_tx(&mut self, tx_type: &TxRecordType, tx_id: &u32, amount: &f64) {
         match *tx_type {
             TxRecordType::DEPOSIT => {
@@ -49,7 +54,12 @@ impl Account {
                 }
                 self.available += *amount;
                 self.total += *amount;
-                self.update_conflicts(tx_type, tx_id, amount);
+                self.update_conflicts(tx_id, tx_type, amount);
+
+                // println!(
+                //     "deposit --> client {}, available: {}, held: {}, total: {}, locked: {}",
+                //     self.client_id, self.available, self.held, self.total, self.locked
+                // );
             }
             TxRecordType::WITHDRAW => {
                 if self.locked {
@@ -58,72 +68,85 @@ impl Account {
                 if self.available >= *amount {
                     self.available -= *amount;
                     self.total -= *amount;
+                    // println!(
+                    //     "withdraw --> client {}, available: {}, held: {}, total: {}, locked: {}",
+                    //     self.client_id, self.available, self.held, self.total, self.locked
+                    // );
                 }
-                self.update_conflicts(tx_type, tx_id, amount);
+                self.update_conflicts(tx_id, tx_type, amount);
             }
             TxRecordType::DISPUTE => {
-                if self.locked || self.under_dispute() {
+                if self.locked {
                     return;
+                }
+
+                if let Some(map) = &mut self.tx_conflict_map {
+                    if map.contains_key(tx_id) {
+                        map.entry(tx_id.clone()).and_modify(|e| {
+                            if e.state == TxRecordType::NONE {
+                                e.state = TxRecordType::DISPUTE;
+                                self.held += e.amount;
+                                self.available -= e.amount;
+                                println!(
+                                    "dispute --> tx_id: {}, client {}, available: {}, held: {}, total: {}, locked: {}",
+                                    tx_id, self.client_id, self.available, self.held, self.total, self.locked
+                                );
+                            }
+                        });
+                    }
                 }
             }
             TxRecordType::RESOLVE => {
-                if self.locked || !self.under_dispute() {
+                if self.locked {
                     return;
+                }
+
+                if let Some(map) = &mut self.tx_conflict_map {
+                    if map.contains_key(tx_id) {
+                        map.entry(tx_id.clone()).and_modify(|e| {
+                            if e.state == TxRecordType::DISPUTE {
+                                self.held -= e.amount;
+                                self.available += e.amount;
+                                e.state = TxRecordType::NONE;
+                                println!(
+                                    "resolve --> tx_id: {}, client {}, available: {}, held: {}, total: {}, locked: {}",
+                                    tx_id, self.client_id, self.available, self.held, self.total, self.locked
+                                );
+                            }
+                        });
+                    }
                 }
             }
             TxRecordType::CHARGEBACK => {
-                if self.locked || self.under_dispute() {
+                if self.locked {
                     return;
+                }
+
+                if let Some(map) = &mut self.tx_conflict_map {
+                    if map.contains_key(tx_id) {
+                        map.entry(tx_id.clone()).and_modify(|e| {
+                            if e.state == TxRecordType::DISPUTE {
+                                self.held -= e.amount;
+                                self.total -= e.amount;
+                                self.locked = true;
+                                e.state = TxRecordType::CHARGEBACK;
+                                // println!(
+                                //     "chargeback --> tx_id: {}, client {}, available: {}, held: {}, total: {}, locked: {}",
+                                //     tx_id, self.client_id, self.available, self.held, self.total, self.locked
+                                // );
+                            }
+                        });
+                    }
                 }
             }
             _ => {}
         }
     }
 
-    // change this to check the tx conflict map state for the tx_id!
-    fn under_dispute(&self) -> bool {
-        self.held > 0.0
-    }
-
-    fn update_conflicts(&mut self, tx_type: &TxRecordType, tx_id: &u32, amount: &f64) {
-        if let Some(map) = &mut self.tx_conflict_map {
-            if tx_type.conflict_type() {
-                return;
-            }
-
-            if !map.contains_key(&tx_id) {
-                return;
-            }
-
-            if let Some(value) = map.get(&tx_id) {
-                if *value > 0.0 {
-                    return;
-                }
-            }
-
-            map.entry(tx_id.clone()).and_modify(|e| {
-                // note: need to apply the opposite sign when reversing the transaction
-                if *tx_type == TxRecordType::DEPOSIT {
-                    *e = *amount;
-                } else {
-                    *e = -(*amount);
-                }
-            });
-
-            println!(
-                "client conflict updated --> type: {}, client: {}, tx: {}, amount: {:?}",
-                tx_type.name(),
-                self.client_id,
-                tx_id,
-                amount
-            );
-        }
-    }
-
-    fn get_tx_id_conflict_map(tx_dir: &str) -> Option<HashMap<u32, f64>> {
+    fn load_tx_id_conflict_map(tx_dir: &str) -> Option<HashMap<u32, TxConflict>> {
         let conflict_dir = [tx_dir, "conflicts"].join("/");
-        println!("conflict_dir: {}", conflict_dir);
         let paths = fs::read_dir(&conflict_dir);
+
         if paths.is_err() {
             return None;
         }
@@ -153,7 +176,7 @@ impl Account {
             return None;
         }
 
-        let mut map: HashMap<u32, f64> = HashMap::new();
+        let mut map: HashMap<u32, TxConflict> = HashMap::new();
         for path in conflict_paths {
             let result = fs::File::open(&path);
             if result.is_err() {
@@ -169,7 +192,14 @@ impl Account {
                 for x in list.split(",") {
                     let tx_id = x.to_string().parse::<u32>().unwrap();
                     if !map.contains_key(&tx_id) {
-                        map.insert(tx_id, 0.0);
+                        map.insert(
+                            tx_id,
+                            TxConflict {
+                                state: TxRecordType::NONE,
+                                tx_type: TxRecordType::NONE,
+                                amount: 0.0,
+                            },
+                        );
                     }
                 }
             }
@@ -180,5 +210,36 @@ impl Account {
         }
 
         Some(map)
+    }
+
+    fn update_conflicts(&mut self, tx_id: &u32, tx_type: &TxRecordType, amount: &f64) {
+        if let Some(map) = &mut self.tx_conflict_map {
+            if tx_type.conflict_type() {
+                return;
+            }
+
+            if !map.contains_key(&tx_id) {
+                return;
+            }
+
+            if let Some(conflict) = map.get(&tx_id) {
+                if conflict.tx_type != TxRecordType::NONE {
+                    return;
+                }
+            }
+
+            map.entry(tx_id.clone()).and_modify(|e| {
+                e.tx_type = tx_type.clone();
+                e.amount = *amount;
+            });
+
+            // println!(
+            //     "client conflict updated --> type: {}, client: {}, tx: {}, amount: {:?}",
+            //     tx_type.name(),
+            //     self.client_id,
+            //     tx_id,
+            //     amount
+            // );
+        }
     }
 }
