@@ -79,7 +79,7 @@ where
 
         file_paths.sort_by(|a, b| {
             // all client tx csv files are of the format client_id.csv
-            println!("a: {:?}, b: {:?}", a, b);
+            // println!("a: {:?}, b: {:?}", a, b);
 
             let x: Vec<&str> = a.1.split(".").collect();
             let y: Vec<&str> = b.1.split(".").collect();
@@ -95,64 +95,6 @@ where
 
         let fps: Vec<String> = file_paths.iter().map(|e| e.0.clone()).collect();
         Ok((dir, fps))
-    }
-
-    fn tx_ids_in_client_conflict_dir(tx_dir: &str) -> Result<Option<HashMap<u32, f64>>, AppError> {
-        let conflict_dir = [tx_dir, "conflicts"].join("/");
-        let paths = fs::read_dir(&conflict_dir)
-            .map_err(|e| AppError::new(PATH, FN_PROCESS_ENTRY, "00", &e.to_string()))?;
-
-        let conflict_paths: Vec<String> = paths
-            .map(|e| {
-                if e.is_err() {
-                    return "".to_string();
-                }
-
-                let path = e.unwrap();
-                if path.path().file_name().is_none() {
-                    return "".to_string();
-                }
-
-                if !path.path().is_file() {
-                    return "".to_string();
-                }
-
-                path.path().display().to_string()
-            })
-            .filter(|s| s.len() > 0)
-            .collect();
-
-        if conflict_paths.len() == 0 {
-            return Ok(None);
-        }
-
-        let mut map: HashMap<u32, f64> = HashMap::new();
-        for path in conflict_paths {
-            let result = fs::File::open(&path);
-            if result.is_err() {
-                continue;
-            }
-
-            let mut f = result.unwrap();
-            let mut s = String::new();
-            let result = f.read_to_string(&mut s);
-
-            if result.is_ok() {
-                let list = s.replace("{", "").replace("}", "").replace(" ", "");
-                for x in list.split(",") {
-                    let tx_id = x.to_string().parse::<u32>().unwrap();
-                    if !map.contains_key(&tx_id) {
-                        map.insert(tx_id, 0.0);
-                    }
-                }
-            }
-        }
-
-        if map.len() == 0 {
-            return Ok(None);
-        }
-
-        Ok(Some(map))
     }
 }
 
@@ -197,16 +139,15 @@ where
     }
 
     fn process_entry(_out_dir: &str, entry: &T) -> Result<(), AppError> {
-        let (dir, file_paths) = Self::file_path_and_names_in_client_tx_dir(entry)?;
+        let (tx_dir, file_paths) = Self::file_path_and_names_in_client_tx_dir(entry)?;
 
         if file_paths.len() == 0 {
             return Ok(());
         }
 
-        let tx_conflict_map = Self::tx_ids_in_client_conflict_dir(&dir)?;
-        let mut account = Account::new(0, tx_conflict_map);
-        let mut initial_loop = true;
+        let mut account = Account::new(&tx_dir)?;
         let mut tx_reader = TxRecordReader::new(&file_paths.get(0).unwrap())?;
+        let mut initial_loop = true;
 
         for path in file_paths {
             if initial_loop {
@@ -216,7 +157,6 @@ where
 
             while tx_reader.next_record() {
                 if let Some(e) = tx_reader.error() {
-                    // println!("fatal error. rolling back");
                     return Err(AppError::new(PATH, FN_PROCESS_ENTRY, "01", &e.to_string()));
                 }
                 account.handle_tx(

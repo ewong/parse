@@ -1,13 +1,16 @@
-use std::collections::HashMap;
-
-// use csv::{ByteRecord, Reader, Writer};
 use serde::{Deserialize, Serialize};
-
-use super::tx_record::TxRecordType;
+use std::io::Read;
+use std::{collections::HashMap, fs};
+// use csv::{ByteRecord, Reader, Writer};
 // use std::collections::HashSet;
 // use std::fs::{self, File};
-// use std::io::Write;
 // use std::str;
+
+use crate::lib::error::AppError;
+
+use super::tx_record::TxRecordType;
+
+const PATH: &str = "models/account";
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct Account {
@@ -24,15 +27,35 @@ pub struct Account {
 
 impl Account {
     // todo: check to see the client has an existing account
-    pub fn new(client_id: u16, tx_conflict_map: Option<HashMap<u32, f64>>) -> Self {
-        Self {
-            client_id,
+    pub fn new(tx_dir: &str) -> Result<Self, AppError> {
+        let tx_conflict_map = Self::get_tx_id_conflict_map(tx_dir);
+
+        let result = tx_dir[..tx_dir.len() - 1].rfind("/");
+        if result.is_none() {
+            println!("{}", tx_dir);
+            return Err(AppError::new(PATH, "new", "00", "failed to get client id"));
+        }
+
+        let pos = result.unwrap();
+        if pos > tx_dir.len() - 1 {
+            println!("{}", tx_dir);
+            return Err(AppError::new(PATH, "new", "01", "failed to get client id"));
+        }
+
+        let result = tx_dir[(pos + 1)..(tx_dir.len() - 1)].parse::<u16>();
+        if result.is_err() {
+            println!("{}", tx_dir);
+            return Err(AppError::new(PATH, "new", "02", "failed to get client id"));
+        }
+
+        Ok(Self {
+            client_id: result.unwrap(),
             available: 0.0,
             held: 0.0,
             total: 0.0,
             locked: false,
             tx_conflict_map,
-        }
+        })
     }
 
     pub fn handle_tx(&mut self, tx_type: &TxRecordType, tx_id: &u32, amount: &f64) {
@@ -112,5 +135,66 @@ impl Account {
                 amount
             );
         }
+    }
+
+    fn get_tx_id_conflict_map(tx_dir: &str) -> Option<HashMap<u32, f64>> {
+        let conflict_dir = [tx_dir, "conflicts"].join("");
+        let paths = fs::read_dir(&conflict_dir);
+        if paths.is_err() {
+            return None;
+        }
+
+        let conflict_paths: Vec<String> = paths
+            .unwrap()
+            .map(|e| {
+                if e.is_err() {
+                    return "".to_string();
+                }
+
+                let path = e.unwrap();
+                if path.path().file_name().is_none() {
+                    return "".to_string();
+                }
+
+                if !path.path().is_file() {
+                    return "".to_string();
+                }
+
+                path.path().display().to_string()
+            })
+            .filter(|s| s.len() > 0)
+            .collect();
+
+        if conflict_paths.len() == 0 {
+            return None;
+        }
+
+        let mut map: HashMap<u32, f64> = HashMap::new();
+        for path in conflict_paths {
+            let result = fs::File::open(&path);
+            if result.is_err() {
+                continue;
+            }
+
+            let mut f = result.unwrap();
+            let mut s = String::new();
+            let result = f.read_to_string(&mut s);
+
+            if result.is_ok() {
+                let list = s.replace("{", "").replace("}", "").replace(" ", "");
+                for x in list.split(",") {
+                    let tx_id = x.to_string().parse::<u32>().unwrap();
+                    if !map.contains_key(&tx_id) {
+                        map.insert(tx_id, 0.0);
+                    }
+                }
+            }
+        }
+
+        if map.len() == 0 {
+            return None;
+        }
+
+        Some(map)
     }
 }
