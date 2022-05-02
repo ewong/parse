@@ -1,6 +1,8 @@
 use crossbeam_channel::Receiver;
+use std::collections::HashMap;
 use std::fmt::{Debug, Display};
 use std::fs;
+use std::io::Read;
 use std::path::Path;
 use std::sync::{Arc, Mutex};
 
@@ -35,6 +37,120 @@ where
             arc_shutdown: Arc::new(Mutex::new(true)),
             arc_q: Arc::new(Mutex::new(dir_paths)),
         }
+    }
+
+    fn file_path_and_names_in_client_tx_dir(entry: &T) -> Result<(String, Vec<String>), AppError> {
+        let paths = fs::read_dir(entry)
+            .map_err(|e| AppError::new(PATH, FN_PROCESS_ENTRY, "00", &e.to_string()))?;
+
+        let mut file_paths: Vec<(String, String)> = paths
+            .map(|e| {
+                if e.is_err() {
+                    return ("".to_string(), "".to_string());
+                }
+
+                let path = e.unwrap();
+                if path.path().file_name().is_none() {
+                    return ("".to_string(), "".to_string());
+                }
+
+                if !path.path().is_file() {
+                    return ("".to_string(), "".to_string());
+                }
+
+                (
+                    path.path().display().to_string(),
+                    path.path()
+                        .file_name()
+                        .unwrap()
+                        .to_str()
+                        .unwrap()
+                        .to_string(),
+                )
+            })
+            .filter(|s| s.0.len() > 0)
+            .collect();
+
+        if file_paths.len() == 0 {
+            return Ok(("".to_string(), Vec::new()));
+        }
+
+        file_paths.sort_by(|a, b| {
+            // all client tx csv files are of the format client_id.csv
+            println!("a: {:?}, b: {:?}", a, b);
+
+            let x: Vec<&str> = a.1.split(".").collect();
+            let y: Vec<&str> = b.1.split(".").collect();
+
+            let client_id0 = x[0].to_string().parse::<u16>().unwrap();
+            let client_id1 = y[0].to_string().parse::<u16>().unwrap();
+
+            client_id0.cmp(&client_id1)
+        });
+
+        let fp = file_paths.get(0).unwrap();
+        let dir = fp.0.replace(&fp.1, "");
+
+        let fps: Vec<String> = file_paths.iter().map(|e| e.0.clone()).collect();
+        Ok((dir, fps))
+    }
+
+    fn tx_ids_in_client_conflict_dir(tx_dir: &str) -> Result<Option<HashMap<u32, f64>>, AppError> {
+        let conflict_dir = [tx_dir, "conflicts"].join("/");
+        let paths = fs::read_dir(&conflict_dir)
+            .map_err(|e| AppError::new(PATH, FN_PROCESS_ENTRY, "00", &e.to_string()))?;
+
+        let conflict_paths: Vec<String> = paths
+            .map(|e| {
+                if e.is_err() {
+                    return "".to_string();
+                }
+
+                let path = e.unwrap();
+                if path.path().file_name().is_none() {
+                    return "".to_string();
+                }
+
+                if !path.path().is_file() {
+                    return "".to_string();
+                }
+
+                path.path().display().to_string()
+            })
+            .filter(|s| s.len() > 0)
+            .collect();
+
+        if conflict_paths.len() == 0 {
+            return Ok(None);
+        }
+
+        let mut map: HashMap<u32, f64> = HashMap::new();
+        for path in conflict_paths {
+            let result = fs::File::open(&path);
+            if result.is_err() {
+                continue;
+            }
+
+            let mut f = result.unwrap();
+            let mut s = String::new();
+            let result = f.read_to_string(&mut s);
+
+            if result.is_ok() {
+                let list = s.replace("{", "").replace("}", "").replace(" ", "");
+                for x in list.split(",") {
+                    let tx_id = x.to_string().parse::<u32>().unwrap();
+                    if !map.contains_key(&tx_id) {
+                        map.insert(tx_id, 0.0);
+                    }
+                }
+            }
+        }
+
+        if map.len() == 0 {
+            return Ok(None);
+        }
+
+        Ok(Some(map))
     }
 }
 
@@ -78,90 +194,40 @@ where
         &self.out_dir
     }
 
-    fn process_entry(out_dir: &str, entry: &T) -> Result<(), AppError> {
-        // let timer = Timer::start();
-        let paths = fs::read_dir(entry)
-            .map_err(|e| AppError::new(PATH, FN_PROCESS_ENTRY, "00", &e.to_string()))?;
-
-        let mut file_paths: Vec<(String, String)> = paths
-            .map(|e| {
-                if e.is_err() {
-                    return ("".to_string(), "".to_string());
-                }
-
-                let path = e.unwrap();
-                if path.path().file_name().is_none() {
-                    return ("".to_string(), "".to_string());
-                }
-
-                if !path.path().is_file() {
-                    return ("".to_string(), "".to_string());
-                }
-
-                (
-                    path.path().display().to_string(),
-                    path.path()
-                        .file_name()
-                        .unwrap()
-                        .to_str()
-                        .unwrap()
-                        .to_string(),
-                )
-            })
-            .filter(|s| s.0.len() > 0)
-            .collect();
+    fn process_entry(_out_dir: &str, entry: &T) -> Result<(), AppError> {
+        let (dir, file_paths) = Self::file_path_and_names_in_client_tx_dir(entry)?;
 
         if file_paths.len() == 0 {
             return Ok(());
         }
 
-        // find conflict paths
-
-        file_paths.sort_by(|a, b| {
-            // all client tx csv files are of the format client_id.csv
-            println!("a: {:?}, b: {:?}", a, b);
-
-            let x: Vec<&str> = a.1.split(".").collect();
-            let y: Vec<&str> = b.1.split(".").collect();
-
-            let client_id0 = x[0].to_string().parse::<u16>().unwrap();
-            let client_id1 = y[0].to_string().parse::<u16>().unwrap();
-
-            client_id0.cmp(&client_id1)
-        });
-
         let mut initial_loop = true;
-        let mut tx_reader = TxRecordReader::new(&file_paths.get(0).unwrap().0)?;
+        let mut conflict_map = Self::tx_ids_in_client_conflict_dir(&dir)?;
+        let mut tx_reader = TxRecordReader::new(&file_paths.get(0).unwrap())?;
 
         for path in file_paths {
             if initial_loop {
-                tx_reader.set_reader(&path.0)?;
+                tx_reader.set_reader(&path)?;
                 initial_loop = false;
             }
 
-            // get conflicts
-            let mut conflict_tx_ids = tx_reader.read_conflicted_tx_ids(
-                &[&path.0.replace(&path.1, ""), "conflicts"].join(""),
-                &path.1,
-            )?;
-
             while tx_reader.next_record() {
-                if conflict_tx_ids.contains_key(tx_reader.tx_record_tx())
-                    && !tx_reader.tx_record_type().conflict_type()
-                {
-                    let amount = tx_reader.tx_record_amount().unwrap();
-                    conflict_tx_ids
-                        .entry(tx_reader.tx_record_tx().clone())
-                        .and_modify(|e| {
+                if let Some(map) = &mut conflict_map {
+                    if map.contains_key(tx_reader.tx_record_tx())
+                        && !tx_reader.tx_record_type().conflict_type()
+                    {
+                        let amount = tx_reader.tx_record_amount().unwrap();
+                        map.entry(tx_reader.tx_record_tx().clone()).and_modify(|e| {
                             *e = amount;
                         });
-                    println!(
-                        "client conflict match --> type: {}, client: {}, tx: {}, amount: {:?}",
-                        tx_reader.tx_record_type().name(),
-                        tx_reader.tx_record_client(),
-                        tx_reader.tx_record_tx(),
-                        tx_reader.tx_record_amount()
-                    );
+                        println!(
+                            "client conflict match --> type: {}, client: {}, tx: {}, amount: {:?}",
+                            tx_reader.tx_record_type().name(),
+                            tx_reader.tx_record_client(),
+                            tx_reader.tx_record_tx(),
+                            tx_reader.tx_record_amount()
+                        );
+                    }
                 }
 
                 // handle rollback
@@ -176,3 +242,51 @@ where
         Ok(())
     }
 }
+
+// let paths = fs::read_dir(entry)
+//     .map_err(|e| AppError::new(PATH, FN_PROCESS_ENTRY, "00", &e.to_string()))?;
+
+// let mut file_paths: Vec<(String, String)> = paths
+//     .map(|e| {
+//         if e.is_err() {
+//             return ("".to_string(), "".to_string());
+//         }
+
+//         let path = e.unwrap();
+//         if path.path().file_name().is_none() {
+//             return ("".to_string(), "".to_string());
+//         }
+
+//         if !path.path().is_file() {
+//             return ("".to_string(), "".to_string());
+//         }
+
+//         (
+//             path.path().display().to_string(),
+//             path.path()
+//                 .file_name()
+//                 .unwrap()
+//                 .to_str()
+//                 .unwrap()
+//                 .to_string(),
+//         )
+//     })
+//     .filter(|s| s.0.len() > 0)
+//     .collect();
+
+// if file_paths.len() == 0 {
+//     return Ok(());
+// }
+
+// file_paths.sort_by(|a, b| {
+//     // all client tx csv files are of the format client_id.csv
+//     println!("a: {:?}, b: {:?}", a, b);
+
+//     let x: Vec<&str> = a.1.split(".").collect();
+//     let y: Vec<&str> = b.1.split(".").collect();
+
+//     let client_id0 = x[0].to_string().parse::<u16>().unwrap();
+//     let client_id1 = y[0].to_string().parse::<u16>().unwrap();
+
+//     client_id0.cmp(&client_id1)
+// });
