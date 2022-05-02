@@ -1,8 +1,8 @@
 use csv::{ByteRecord, Reader, Writer};
 use serde::{Deserialize, Serialize};
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::fs::{self, File};
-use std::io::Write;
+use std::io::{Read, Write};
 use std::str;
 
 use crate::lib::error::AppError;
@@ -25,10 +25,9 @@ const B_WITHDRAW: &[u8] = b"withdraw";
 const B_DISPUTE: &[u8] = b"dispute";
 const B_RESOLVE: &[u8] = b"resolve";
 const B_CHARGEBACK: &[u8] = b"chargeback";
-const B_NONE: &[u8] = b"";
 
 #[derive(PartialEq)]
-enum TxRecordType {
+pub enum TxRecordType {
     DEPOSIT = 0,
     WITHDRAW,
     DISPUTE,
@@ -38,49 +37,49 @@ enum TxRecordType {
 }
 
 impl TxRecordType {
-    fn from_binary(binary: &[u8]) -> Self {
+    pub fn from_binary(binary: &[u8]) -> Self {
         let initial_type = match binary {
-            B_DEPOSIT => TxRecordType::DEPOSIT,
-            B_WITHDRAW => TxRecordType::WITHDRAW,
-            B_DISPUTE => TxRecordType::DISPUTE,
-            B_RESOLVE => TxRecordType::RESOLVE,
-            B_CHARGEBACK => TxRecordType::CHARGEBACK,
-            _ => TxRecordType::NONE,
+            B_DEPOSIT => Self::DEPOSIT,
+            B_WITHDRAW => Self::WITHDRAW,
+            B_DISPUTE => Self::DISPUTE,
+            B_RESOLVE => Self::RESOLVE,
+            B_CHARGEBACK => Self::CHARGEBACK,
+            _ => Self::NONE,
         };
 
-        if initial_type != TxRecordType::NONE {
+        if initial_type != Self::NONE {
             return initial_type;
         }
 
         // try to convert it to a lower case str + retest
         if let Ok(str) = str::from_utf8(binary) {
             return match str.to_lowercase().as_str() {
-                "deposit" => TxRecordType::DEPOSIT,
-                "withdraw" => TxRecordType::WITHDRAW,
-                "dispute" => TxRecordType::DISPUTE,
-                "resolve" => TxRecordType::RESOLVE,
-                "chargeback" => TxRecordType::CHARGEBACK,
-                _ => TxRecordType::NONE,
+                "deposit" => Self::DEPOSIT,
+                "withdraw" => Self::WITHDRAW,
+                "dispute" => Self::DISPUTE,
+                "resolve" => Self::RESOLVE,
+                "chargeback" => Self::CHARGEBACK,
+                _ => Self::NONE,
             };
         }
 
         // return none
-        TxRecordType::NONE
+        Self::NONE
     }
 
-    fn conflict_type(&self) -> bool {
+    pub fn conflict_type(&self) -> bool {
         *self == Self::DISPUTE || *self == Self::RESOLVE || *self == Self::CHARGEBACK
     }
 
-    fn as_binary(&self) -> &[u8] {
-        match self {
-            DEPOSIT => B_DEPOSIT,
-            WITHDRAW => B_WITHDRAW,
-            DISPUTE => B_DISPUTE,
-            RESOLVE => B_RESOLVE,
-            CHARGEBACK => B_CHARGEBACK,
-            NONE => B_NONE,
-        }
+    pub fn name(&self) -> &str {
+        return match self {
+            Self::DEPOSIT => "deposit",
+            Self::WITHDRAW => "withdraw",
+            Self::DISPUTE => "dispute",
+            Self::RESOLVE => "resolve",
+            Self::CHARGEBACK => "chargeback",
+            _ => "none",
+        };
     }
 }
 
@@ -110,8 +109,10 @@ impl<'a> TxRecord<'a> {
 pub struct TxRecordReader {
     reader: Reader<File>,
     headers: ByteRecord,
-    pub byte_record_client: u16,
-    pub byte_record_tx: Option<u32>,
+    tx_record_type: TxRecordType,
+    tx_record_client: u16,
+    tx_record_tx: u32,
+    tx_record_amount: Option<f64>,
     byte_record: ByteRecord,
     error: Option<String>,
 }
@@ -126,8 +127,10 @@ impl TxRecordReader {
         Ok(Self {
             reader,
             headers,
-            byte_record_client: 0,
-            byte_record_tx: None,
+            tx_record_type: TxRecordType::NONE,
+            tx_record_client: 0,
+            tx_record_tx: 0,
+            tx_record_amount: None,
             byte_record: ByteRecord::new(),
             error: None,
         })
@@ -142,16 +145,24 @@ impl TxRecordReader {
         &self.byte_record
     }
 
+    pub fn tx_record_type(&self) -> &TxRecordType {
+        &self.tx_record_type
+    }
+
+    pub fn tx_record_client(&self) -> &u16 {
+        &self.tx_record_client
+    }
+
+    pub fn tx_record_tx(&self) -> &u32 {
+        &self.tx_record_tx
+    }
+
+    pub fn tx_record_amount(&self) -> &Option<f64> {
+        &self.tx_record_amount
+    }
+
     pub fn error(&self) -> &Option<String> {
         &self.error
-    }
-
-    pub fn byte_record_client(&self) -> &u16 {
-        &self.byte_record_client
-    }
-
-    pub fn byte_record_tx(&self) -> &Option<u32> {
-        &self.byte_record_tx
     }
 
     pub fn next_record(&mut self) -> bool {
@@ -187,15 +198,38 @@ impl TxRecordReader {
         }
 
         let tx_record = result.unwrap();
-        self.byte_record_client = tx_record.client_id;
-
-        if tx_record_type.conflict_type() {
-            self.byte_record_tx = Some(tx_record.tx_id);
-        } else {
-            self.byte_record_tx = None;
-        }
+        self.tx_record_type = TxRecordType::from_binary(tx_record.type_id);
+        self.tx_record_client = tx_record.client_id;
+        self.tx_record_tx = tx_record.tx_id;
+        self.tx_record_amount = tx_record.amount;
 
         true
+    }
+
+    pub fn read_conflicted_tx_ids(
+        &self,
+        dir_path: &str,
+        file_name: &str,
+    ) -> Result<Vec<u32>, AppError> {
+        let path = [dir_path, file_name].join("/");
+        let result = fs::File::open(&path);
+        if result.is_err() {
+            return Ok(Vec::new());
+        }
+
+        let mut f = result.unwrap();
+        let mut s = String::new();
+        let result = f.read_to_string(&mut s);
+        if result.is_ok() {
+            let list = s.replace("{", "").replace("}", "").replace(" ", "");
+            let v = list
+                .split(",")
+                .map(|x| x.to_string().parse::<u32>().unwrap())
+                .collect();
+            return Ok(v);
+        }
+
+        Ok(Vec::new())
     }
 
     fn csv_reader(csv_path: &str) -> Result<Reader<File>, AppError> {

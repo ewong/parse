@@ -29,8 +29,8 @@ impl<'a> Processor<'a> {
         let working_dir = self.file_dir()?;
         self.cluster_transactions_by_client(&working_dir)?;
         self.summarize_transactions_by_client(&working_dir)?;
-        println!("removing working directory");
-        let _ = fs::remove_dir_all(working_dir);
+        // println!("removing working directory");
+        // let _ = fs::remove_dir_all(working_dir);
         timer.stop();
         Ok(())
     }
@@ -51,7 +51,7 @@ impl<'a> Processor<'a> {
         // let timer = Timer::start();
 
         let mut tx_cluster = TxCluster::new(0);
-        let mut rdr = TxRecordReader::new(self.file_path)?;
+        let mut tx_reader = TxRecordReader::new(self.file_path)?;
         let mut q = TxClusterQueue::new(working_dir);
         // let mut block_timer = Timer::start();
 
@@ -59,12 +59,11 @@ impl<'a> Processor<'a> {
         let mut block: usize = 0;
         let mut rows: usize = 0;
 
-        while rdr.next_record() {
-            tx_cluster.add(
-                rdr.byte_record_client(),
-                rdr.byte_record_tx(),
-                rdr.byte_record(),
-            );
+        while tx_reader.next_record() {
+            tx_cluster.add_tx(tx_reader.tx_record_client(), tx_reader.byte_record());
+            if tx_reader.tx_record_type().conflict_type() {
+                tx_cluster.add_conflict(tx_reader.tx_record_client(), tx_reader.tx_record_tx());
+            }
 
             rows += 1;
             if rows == BLOCK_SIZE {
@@ -90,7 +89,7 @@ impl<'a> Processor<'a> {
         }
 
         // handle rollback
-        if let Some(error) = rdr.error() {
+        if let Some(error) = tx_reader.error() {
             let _ = q.stop();
             let _ = fs::remove_dir_all(working_dir);
             return Err(AppError::new(

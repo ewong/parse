@@ -23,12 +23,7 @@ impl TxCluster {
         }
     }
 
-    pub fn add(&mut self, client_id: &u16, tx_id: &Option<u32>, byte_record: &ByteRecord) {
-        self.add_tx(client_id, byte_record);
-        self.add_conflict(client_id, tx_id);
-    }
-
-    fn add_tx(&mut self, client_id: &u16, byte_record: &ByteRecord) {
+    pub fn add_tx(&mut self, client_id: &u16, byte_record: &ByteRecord) {
         if self.client_txns.contains_key(client_id) {
             self.client_txns.entry(client_id.clone()).and_modify(|e| {
                 e.push(byte_record.clone());
@@ -40,18 +35,18 @@ impl TxCluster {
         self.client_txns.insert(client_id.clone(), v);
     }
 
-    fn add_conflict(&mut self, client_id: &u16, tx_id: &Option<u32>) {
-        if let Some(tid) = tx_id {
-            if self.client_conflicts.contains_key(client_id) {
-                self.client_conflicts.entry(client_id.clone()).and_modify(|e| {
-                    e.insert(tid.clone());
+    pub fn add_conflict(&mut self, client_id: &u16, tx_id: &u32) {
+        if self.client_conflicts.contains_key(client_id) {
+            self.client_conflicts
+                .entry(client_id.clone())
+                .and_modify(|e| {
+                    e.insert(tx_id.clone());
                 });
-                return;
-            }
-            let mut set = HashSet::new();
-            set.insert(tid.clone());
-            self.client_conflicts.insert(client_id.clone(), set);
+            return;
         }
+        let mut set = HashSet::new();
+        set.insert(tx_id.clone());
+        self.client_conflicts.insert(client_id.clone(), set);
     }
 }
 
