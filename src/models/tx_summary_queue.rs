@@ -145,16 +145,18 @@ where
                 &[&path.0.replace(&path.1, ""), "conflicts"].join(""),
                 &path.1,
             )?;
-            println!("{:?}", tx_ids);
+            // println!("{:?}", tx_ids);
 
             while tx_reader.next_record() {
-                // println!(
-                //     "type: {}, client: {}, tx: {}, amount: {:?}",
-                //     tx_reader.tx_record_type().name(),
-                //     tx_reader.tx_record_client(),
-                //     tx_reader.tx_record_tx(),
-                //     tx_reader.tx_record_amount(),
-                // );
+                if tx_ids.contains(tx_reader.tx_record_tx()) {
+                    println!(
+                        "client conflict match --> type: {}, client: {}, tx: {}, amount: {:?}",
+                        tx_reader.tx_record_type().name(),
+                        tx_reader.tx_record_client(),
+                        tx_reader.tx_record_tx(),
+                        tx_reader.tx_record_amount()
+                    );
+                }
 
                 // handle rollback
                 if let Some(e) = tx_reader.error() {
