@@ -24,13 +24,14 @@ impl<'a> Processor<'a> {
         Self { file_path }
     }
 
-    pub fn process_csv(&self) -> Result<(), AppError> {
+    pub fn process_csv(&self, cleanup: bool) -> Result<(), AppError> {
         let timer = Timer::start();
         let working_dir = self.file_dir()?;
-        // self.cluster_transactions_by_client(&working_dir)?;
+        self.cluster_transactions_by_client(&working_dir)?;
         self.summarize_transactions_by_client(&working_dir)?;
-        // println!("removing working directory");
-        // let _ = fs::remove_dir_all(working_dir);
+        if cleanup {
+            let _ = fs::remove_dir_all(working_dir);
+        }
         timer.stop();
         Ok(())
     }
