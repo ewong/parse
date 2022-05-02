@@ -71,16 +71,16 @@ impl TxRecordType {
         *self == Self::DISPUTE || *self == Self::RESOLVE || *self == Self::CHARGEBACK
     }
 
-    pub fn name(&self) -> &str {
-        return match self {
-            Self::DEPOSIT => "deposit",
-            Self::WITHDRAW => "withdraw",
-            Self::DISPUTE => "dispute",
-            Self::RESOLVE => "resolve",
-            Self::CHARGEBACK => "chargeback",
-            _ => "none",
-        };
-    }
+    // pub fn name(&self) -> &str {
+    //     return match self {
+    //         Self::DEPOSIT => "deposit",
+    //         Self::WITHDRAW => "withdraw",
+    //         Self::DISPUTE => "dispute",
+    //         Self::RESOLVE => "resolve",
+    //         Self::CHARGEBACK => "chargeback",
+    //         _ => "none",
+    //     };
+    // }
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]

@@ -92,7 +92,7 @@ pub trait TxQueue<T: Send + Sync + 'static> {
         let (s, r) = unbounded();
         self.set_rx(Some(r));
 
-        for wid in 0..Self::num_threads() {
+        for _wid in 0..Self::num_threads() {
             let mtx_q = Arc::clone(&self.mtx_q());
             let mtx_shutdown = Arc::clone(&self.mtx_shutdown());
             let out_dir_path = self.out_dir().to_owned();
