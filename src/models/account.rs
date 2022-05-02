@@ -27,29 +27,12 @@ pub struct Account {
 
 impl Account {
     // todo: check to see the client has an existing account
-    pub fn new(tx_dir: &str) -> Result<Self, AppError> {
+    pub fn new(client_id: u16, tx_dir: &str) -> Result<Self, AppError> {
         let tx_conflict_map = Self::get_tx_id_conflict_map(tx_dir);
-
-        let result = tx_dir[..tx_dir.len() - 1].rfind("/");
-        if result.is_none() {
-            println!("{}", tx_dir);
-            return Err(AppError::new(PATH, "new", "00", "failed to get client id"));
-        }
-
-        let pos = result.unwrap();
-        if pos > tx_dir.len() - 1 {
-            println!("{}", tx_dir);
-            return Err(AppError::new(PATH, "new", "01", "failed to get client id"));
-        }
-
-        let result = tx_dir[(pos + 1)..(tx_dir.len() - 1)].parse::<u16>();
-        if result.is_err() {
-            println!("{}", tx_dir);
-            return Err(AppError::new(PATH, "new", "02", "failed to get client id"));
-        }
+        println!("tx_conflict_map: {:?}", tx_conflict_map);
 
         Ok(Self {
-            client_id: result.unwrap(),
+            client_id,
             available: 0.0,
             held: 0.0,
             total: 0.0,
@@ -138,7 +121,8 @@ impl Account {
     }
 
     fn get_tx_id_conflict_map(tx_dir: &str) -> Option<HashMap<u32, f64>> {
-        let conflict_dir = [tx_dir, "conflicts"].join("");
+        let conflict_dir = [tx_dir, "conflicts"].join("/");
+        println!("conflict_dir: {}", conflict_dir);
         let paths = fs::read_dir(&conflict_dir);
         if paths.is_err() {
             return None;

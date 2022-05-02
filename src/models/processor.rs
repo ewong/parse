@@ -3,6 +3,7 @@ use std::fs;
 use super::tx_cluster::{TxCluster, TxClusterData};
 use super::tx_cluster_queue::TxClusterQueue;
 use super::tx_record::TxRecordReader;
+use super::tx_summary::TxSummary;
 use super::tx_summary_queue::TxSummaryQueue;
 use crate::lib::error::AppError;
 use crate::lib::timer::Timer;
@@ -120,26 +121,10 @@ impl<'a> Processor<'a> {
     }
 
     fn summarize_transactions_by_client(&self, working_dir: &str) -> Result<(), AppError> {
-        // let timer = Timer::start();
-        let paths = fs::read_dir(working_dir)
-            .map_err(|e| AppError::new(PATH, FN_MERGE_TXNS, "00", &e.to_string()))?;
-
-        let dir_paths: Vec<String> = paths
-            .map(|e| {
-                if let Ok(path) = e {
-                    if path.path().is_dir() {
-                        return path.path().display().to_string();
-                    }
-                }
-                "".to_string()
-            })
-            .filter(|s| s.len() > 0)
-            .collect();
-
-        let mut q = TxSummaryQueue::new(ACCOUNT_DIR, dir_paths);
+        let summaries = TxSummary::summaries(working_dir)?;
+        let mut q = TxSummaryQueue::new(ACCOUNT_DIR, summaries);
         q.start()?;
         q.stop()?;
-        // timer.stop();
         Ok(())
     }
 }

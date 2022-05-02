@@ -1,9 +1,5 @@
 use crossbeam_channel::Receiver;
-use std::collections::HashMap;
-use std::fmt::{Debug, Display};
 use std::fs;
-use std::io::Read;
-use std::path::Path;
 use std::sync::{Arc, Mutex};
 
 use crate::lib::error::AppError;
@@ -11,6 +7,7 @@ use crate::lib::tx_queue::TxQueue;
 use crate::models::tx_record::TxRecordReader;
 
 use super::account::Account;
+use super::tx_summary::TxSummaryData;
 
 const PATH: &str = "model/client_queue";
 const FN_PROCESS_ENTRY: &str = "process_entry";
@@ -28,7 +25,7 @@ pub struct TxSummaryQueue<T> {
 
 impl<T> TxSummaryQueue<T>
 where
-    T: Send + Sync + Display + Debug + AsRef<Path> + 'static,
+    T: TxSummaryData,
 {
     pub fn new(out_dir: &str, dir_paths: Vec<T>) -> Self {
         Self {
@@ -41,8 +38,8 @@ where
     }
 
     // todo: implement with priority queue/heap
-    fn file_path_and_names_in_client_tx_dir(entry: &T) -> Result<(String, Vec<String>), AppError> {
-        let paths = fs::read_dir(entry)
+    fn file_path_and_names_in_client_tx_dir(entry: &T) -> Result<Vec<String>, AppError> {
+        let paths = fs::read_dir(entry.dir_path())
             .map_err(|e| AppError::new(PATH, FN_PROCESS_ENTRY, "00", &e.to_string()))?;
 
         let mut file_paths: Vec<(String, String)> = paths
@@ -74,7 +71,7 @@ where
             .collect();
 
         if file_paths.len() == 0 {
-            return Ok(("".to_string(), Vec::new()));
+            return Ok(Vec::new());
         }
 
         file_paths.sort_by(|a, b| {
@@ -90,17 +87,14 @@ where
             client_id0.cmp(&client_id1)
         });
 
-        let fp = file_paths.get(0).unwrap();
-        let dir = fp.0.replace(&fp.1, "");
-
         let fps: Vec<String> = file_paths.iter().map(|e| e.0.clone()).collect();
-        Ok((dir, fps))
+        Ok(fps)
     }
 }
 
 impl<T> TxQueue<T> for TxSummaryQueue<T>
 where
-    T: Send + Sync + Display + Debug + AsRef<Path> + 'static,
+    T: TxSummaryData,
 {
     fn num_threads() -> u16 {
         NUM_THREADS
@@ -139,13 +133,13 @@ where
     }
 
     fn process_entry(_out_dir: &str, entry: &T) -> Result<(), AppError> {
-        let (tx_dir, file_paths) = Self::file_path_and_names_in_client_tx_dir(entry)?;
+        let file_paths = Self::file_path_and_names_in_client_tx_dir(entry)?;
 
         if file_paths.len() == 0 {
             return Ok(());
         }
 
-        let mut account = Account::new(&tx_dir)?;
+        let mut account = Account::new(entry.client_id(), entry.dir_path())?;
         let mut tx_reader = TxRecordReader::new(&file_paths.get(0).unwrap())?;
         let mut initial_loop = true;
 
