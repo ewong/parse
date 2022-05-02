@@ -1,3 +1,4 @@
+use rust_decimal::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::io::Read;
 use std::{collections::HashMap, fs};
@@ -9,16 +10,16 @@ use crate::lib::error::AppError;
 struct TxConflict {
     state: TxRecordType,
     tx_type: TxRecordType,
-    amount: f64,
+    amount: Decimal,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct Account {
     #[serde(rename(deserialize = "client", serialize = "client"))]
     client_id: u16,
-    available: f64,
-    held: f64,
-    total: f64,
+    available: Decimal,
+    held: Decimal,
+    total: Decimal,
     locked: bool,
 
     #[serde(skip)]
@@ -31,9 +32,9 @@ impl Account {
         let tx_conflict_map = Self::load_tx_id_conflict_map(tx_dir);
         Ok(Self {
             client_id,
-            available: 0.0,
-            held: 0.0,
-            total: 0.0,
+            available: Decimal::new(0, 0),
+            held: Decimal::new(0, 0),
+            total: Decimal::new(0, 0),
             locked: false,
             tx_conflict_map,
         })
@@ -46,7 +47,7 @@ impl Account {
         );
     }
 
-    pub fn handle_tx(&mut self, tx_type: &TxRecordType, tx_id: &u32, amount: &f64) {
+    pub fn handle_tx(&mut self, tx_type: &TxRecordType, tx_id: &u32, amount: &Decimal) {
         match *tx_type {
             TxRecordType::DEPOSIT => {
                 if self.locked {
@@ -197,7 +198,7 @@ impl Account {
                             TxConflict {
                                 state: TxRecordType::NONE,
                                 tx_type: TxRecordType::NONE,
-                                amount: 0.0,
+                                amount: Decimal::new(0, 0),
                             },
                         );
                     }
@@ -212,7 +213,7 @@ impl Account {
         Some(map)
     }
 
-    fn update_conflicts(&mut self, tx_id: &u32, tx_type: &TxRecordType, amount: &f64) {
+    fn update_conflicts(&mut self, tx_id: &u32, tx_type: &TxRecordType, amount: &Decimal) {
         if let Some(map) = &mut self.tx_conflict_map {
             if tx_type.conflict_type() {
                 return;

@@ -156,7 +156,7 @@ where
                 account.handle_tx(
                     tx_reader.tx_record_type(),
                     tx_reader.tx_record_tx(),
-                    &tx_reader.tx_record_amount().unwrap(),
+                    tx_reader.tx_record_amount(),
                 );
             }
         }

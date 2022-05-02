@@ -1,4 +1,5 @@
 use csv::{ByteRecord, Reader, Writer};
+use rust_decimal::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::fs::{self, File};
@@ -91,8 +92,16 @@ pub struct TxRecord<'a> {
     pub client_id: u16,
     #[serde(rename(deserialize = "tx", serialize = "tx"))]
     pub tx_id: u32,
-    #[serde(rename(deserialize = "amount", serialize = "amount"))]
-    pub amount: Option<f64>,
+    #[serde(
+        rename(deserialize = "amount", serialize = "amount"),
+        default = "default_amount",
+        with = "rust_decimal::serde::str"
+    )]
+    pub amount: Decimal,
+}
+
+fn default_amount() -> Decimal {
+    Decimal::new(0, 0)
 }
 
 pub struct TxRecordReader {
@@ -101,7 +110,7 @@ pub struct TxRecordReader {
     tx_record_type: TxRecordType,
     tx_record_client: u16,
     tx_record_tx: u32,
-    tx_record_amount: Option<f64>,
+    tx_record_amount: Decimal,
     byte_record: ByteRecord,
     error: Option<String>,
 }
@@ -119,7 +128,7 @@ impl TxRecordReader {
             tx_record_type: TxRecordType::NONE,
             tx_record_client: 0,
             tx_record_tx: 0,
-            tx_record_amount: None,
+            tx_record_amount: Decimal::new(0, 4),
             byte_record: ByteRecord::new(),
             error: None,
         })
@@ -146,7 +155,7 @@ impl TxRecordReader {
         &self.tx_record_tx
     }
 
-    pub fn tx_record_amount(&self) -> &Option<f64> {
+    pub fn tx_record_amount(&self) -> &Decimal {
         &self.tx_record_amount
     }
 
