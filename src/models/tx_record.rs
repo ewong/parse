@@ -210,11 +210,11 @@ impl TxRecordReader {
         &self,
         dir_path: &str,
         file_name: &str,
-    ) -> Result<Vec<u32>, AppError> {
+    ) -> Result<HashMap<u32, f64>, AppError> {
         let path = [dir_path, file_name].join("/");
         let result = fs::File::open(&path);
         if result.is_err() {
-            return Ok(Vec::new());
+            return Ok(HashMap::new());
         }
 
         let mut f = result.unwrap();
@@ -222,14 +222,14 @@ impl TxRecordReader {
         let result = f.read_to_string(&mut s);
         if result.is_ok() {
             let list = s.replace("{", "").replace("}", "").replace(" ", "");
-            let v = list
-                .split(",")
-                .map(|x| x.to_string().parse::<u32>().unwrap())
-                .collect();
-            return Ok(v);
+            let mut map: HashMap<u32, f64> = HashMap::new();
+            for x in list.split(",") {
+                map.insert(x.to_string().parse::<u32>().unwrap(), 0.0);
+            }
+            return Ok(map);
         }
 
-        Ok(Vec::new())
+        Ok(HashMap::new())
     }
 
     fn csv_reader(csv_path: &str) -> Result<Reader<File>, AppError> {

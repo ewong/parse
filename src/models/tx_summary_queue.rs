@@ -7,7 +7,7 @@ use std::sync::{Arc, Mutex};
 use crate::lib::error::AppError;
 // use crate::lib::timer::Timer;
 use crate::lib::tx_queue::TxQueue;
-use crate::models::tx_record::TxRecordReader;
+use crate::models::tx_record::{TxRecordReader, TxRecordType};
 
 const PATH: &str = "model/client_queue";
 const FN_PROCESS_ENTRY: &str = "process_entry";
@@ -130,7 +130,6 @@ where
             client_id0.cmp(&client_id1)
         });
 
-        println!("{:?}", file_paths);
         let mut initial_loop = true;
         let mut tx_reader = TxRecordReader::new(&file_paths.get(0).unwrap().0)?;
 
@@ -141,14 +140,21 @@ where
             }
 
             // get conflicts
-            let tx_ids = tx_reader.read_conflicted_tx_ids(
+            let mut conflict_tx_ids = tx_reader.read_conflicted_tx_ids(
                 &[&path.0.replace(&path.1, ""), "conflicts"].join(""),
                 &path.1,
             )?;
-            // println!("{:?}", tx_ids);
 
             while tx_reader.next_record() {
-                if tx_ids.contains(tx_reader.tx_record_tx()) {
+                if conflict_tx_ids.contains_key(tx_reader.tx_record_tx())
+                    && !tx_reader.tx_record_type().conflict_type()
+                {
+                    let amount = tx_reader.tx_record_amount().unwrap();
+                    conflict_tx_ids
+                        .entry(tx_reader.tx_record_tx().clone())
+                        .and_modify(|e| {
+                            *e = amount;
+                        });
                     println!(
                         "client conflict match --> type: {}, client: {}, tx: {}, amount: {:?}",
                         tx_reader.tx_record_type().name(),
