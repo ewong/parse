@@ -1,8 +1,8 @@
 use csv::{ByteRecord, Reader, Writer};
 use serde::{Deserialize, Serialize};
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::fs::{self, File};
-use std::io::{Read, Write};
+use std::io::Write;
 use std::str;
 
 use crate::lib::error::AppError;
@@ -204,32 +204,6 @@ impl TxRecordReader {
         self.tx_record_amount = tx_record.amount;
 
         true
-    }
-
-    pub fn read_conflicted_tx_ids(
-        &self,
-        dir_path: &str,
-        file_name: &str,
-    ) -> Result<HashMap<u32, f64>, AppError> {
-        let path = [dir_path, file_name].join("/");
-        let result = fs::File::open(&path);
-        if result.is_err() {
-            return Ok(HashMap::new());
-        }
-
-        let mut f = result.unwrap();
-        let mut s = String::new();
-        let result = f.read_to_string(&mut s);
-        if result.is_ok() {
-            let list = s.replace("{", "").replace("}", "").replace(" ", "");
-            let mut map: HashMap<u32, f64> = HashMap::new();
-            for x in list.split(",") {
-                map.insert(x.to_string().parse::<u32>().unwrap(), 0.0);
-            }
-            return Ok(map);
-        }
-
-        Ok(HashMap::new())
     }
 
     fn csv_reader(csv_path: &str) -> Result<Reader<File>, AppError> {

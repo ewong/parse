@@ -11,6 +11,8 @@ use crate::lib::error::AppError;
 use crate::lib::tx_queue::TxQueue;
 use crate::models::tx_record::{TxRecordReader, TxRecordType};
 
+use super::account::Account;
+
 const PATH: &str = "model/client_queue";
 const FN_PROCESS_ENTRY: &str = "process_entry";
 
@@ -39,6 +41,7 @@ where
         }
     }
 
+    // todo: implement with priority queue/heap
     fn file_path_and_names_in_client_tx_dir(entry: &T) -> Result<(String, Vec<String>), AppError> {
         let paths = fs::read_dir(entry)
             .map_err(|e| AppError::new(PATH, FN_PROCESS_ENTRY, "00", &e.to_string()))?;
@@ -201,8 +204,9 @@ where
             return Ok(());
         }
 
+        let tx_conflict_map = Self::tx_ids_in_client_conflict_dir(&dir)?;
+        let mut account = Account::new(0, tx_conflict_map);
         let mut initial_loop = true;
-        let mut conflict_map = Self::tx_ids_in_client_conflict_dir(&dir)?;
         let mut tx_reader = TxRecordReader::new(&file_paths.get(0).unwrap())?;
 
         for path in file_paths {
@@ -212,29 +216,14 @@ where
             }
 
             while tx_reader.next_record() {
-                if let Some(map) = &mut conflict_map {
-                    if map.contains_key(tx_reader.tx_record_tx())
-                        && !tx_reader.tx_record_type().conflict_type()
-                    {
-                        let amount = tx_reader.tx_record_amount().unwrap();
-                        map.entry(tx_reader.tx_record_tx().clone()).and_modify(|e| {
-                            *e = amount;
-                        });
-                        println!(
-                            "client conflict match --> type: {}, client: {}, tx: {}, amount: {:?}",
-                            tx_reader.tx_record_type().name(),
-                            tx_reader.tx_record_client(),
-                            tx_reader.tx_record_tx(),
-                            tx_reader.tx_record_amount()
-                        );
-                    }
-                }
-
-                // handle rollback
                 if let Some(e) = tx_reader.error() {
                     println!("fatal error. rolling back");
                     return Err(AppError::new(PATH, FN_PROCESS_ENTRY, "01", &e.to_string()));
                 }
+                account.handle_tx(
+                    tx_reader.tx_record_type(),
+                    &tx_reader.tx_record_amount().unwrap(),
+                );
             }
         }
 
