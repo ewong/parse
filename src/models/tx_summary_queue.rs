@@ -7,9 +7,8 @@ use std::path::Path;
 use std::sync::{Arc, Mutex};
 
 use crate::lib::error::AppError;
-// use crate::lib::timer::Timer;
 use crate::lib::tx_queue::TxQueue;
-use crate::models::tx_record::{TxRecordReader, TxRecordType};
+use crate::models::tx_record::TxRecordReader;
 
 use super::account::Account;
 
@@ -217,65 +216,17 @@ where
 
             while tx_reader.next_record() {
                 if let Some(e) = tx_reader.error() {
-                    println!("fatal error. rolling back");
+                    // println!("fatal error. rolling back");
                     return Err(AppError::new(PATH, FN_PROCESS_ENTRY, "01", &e.to_string()));
                 }
                 account.handle_tx(
                     tx_reader.tx_record_type(),
+                    tx_reader.tx_record_tx(),
                     &tx_reader.tx_record_amount().unwrap(),
                 );
             }
         }
 
-        // timer.stop();
         Ok(())
     }
 }
-
-// let paths = fs::read_dir(entry)
-//     .map_err(|e| AppError::new(PATH, FN_PROCESS_ENTRY, "00", &e.to_string()))?;
-
-// let mut file_paths: Vec<(String, String)> = paths
-//     .map(|e| {
-//         if e.is_err() {
-//             return ("".to_string(), "".to_string());
-//         }
-
-//         let path = e.unwrap();
-//         if path.path().file_name().is_none() {
-//             return ("".to_string(), "".to_string());
-//         }
-
-//         if !path.path().is_file() {
-//             return ("".to_string(), "".to_string());
-//         }
-
-//         (
-//             path.path().display().to_string(),
-//             path.path()
-//                 .file_name()
-//                 .unwrap()
-//                 .to_str()
-//                 .unwrap()
-//                 .to_string(),
-//         )
-//     })
-//     .filter(|s| s.0.len() > 0)
-//     .collect();
-
-// if file_paths.len() == 0 {
-//     return Ok(());
-// }
-
-// file_paths.sort_by(|a, b| {
-//     // all client tx csv files are of the format client_id.csv
-//     println!("a: {:?}, b: {:?}", a, b);
-
-//     let x: Vec<&str> = a.1.split(".").collect();
-//     let y: Vec<&str> = b.1.split(".").collect();
-
-//     let client_id0 = x[0].to_string().parse::<u16>().unwrap();
-//     let client_id1 = y[0].to_string().parse::<u16>().unwrap();
-
-//     client_id0.cmp(&client_id1)
-// });

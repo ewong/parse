@@ -35,59 +35,82 @@ impl Account {
         }
     }
 
-    pub fn handle_tx(&mut self, tx_type: &TxRecordType, amount: &f64) {
+    pub fn handle_tx(&mut self, tx_type: &TxRecordType, tx_id: &u32, amount: &f64) {
         match *tx_type {
             TxRecordType::DEPOSIT => {
-                self.deposit(amount);
+                if self.locked {
+                    return;
+                }
+                self.available += *amount;
+                self.total += *amount;
+                self.update_conflicts(tx_type, tx_id, amount);
             }
             TxRecordType::WITHDRAW => {
-                self.widthdraw(amount);
+                if self.locked {
+                    return;
+                }
+                if self.available >= *amount {
+                    self.available -= *amount;
+                    self.total -= *amount;
+                }
+                self.update_conflicts(tx_type, tx_id, amount);
             }
-            TxRecordType::DISPUTE => {}
-            TxRecordType::RESOLVE => {}
-            TxRecordType::CHARGEBACK => {}
+            TxRecordType::DISPUTE => {
+                if self.locked || self.under_dispute() {
+                    return;
+                }
+            }
+            TxRecordType::RESOLVE => {
+                if self.locked || !self.under_dispute() {
+                    return;
+                }
+            }
+            TxRecordType::CHARGEBACK => {
+                if self.locked || self.under_dispute() {
+                    return;
+                }
+            }
             _ => {}
         }
-
-        // if let Some(map) = &mut conflict_map {
-        //     if map.contains_key(tx_reader.tx_record_tx())
-        //         && !tx_reader.tx_record_type().conflict_type()
-        //     {
-        //         let amount = tx_reader.tx_record_amount().unwrap();
-        //         map.entry(tx_reader.tx_record_tx().clone()).and_modify(|e| {
-        //             *e = amount;
-        //         });
-        //         println!(
-        //             "client conflict match --> type: {}, client: {}, tx: {}, amount: {:?}",
-        //             tx_reader.tx_record_type().name(),
-        //             tx_reader.tx_record_client(),
-        //             tx_reader.tx_record_tx(),
-        //             tx_reader.tx_record_amount()
-        //         );
-        //     }
-        // }
     }
 
+    // change this to check the tx conflict map state for the tx_id!
     fn under_dispute(&self) -> bool {
         self.held > 0.0
     }
 
-    fn frozen(&self) -> bool {
-        self.locked
-    }
+    fn update_conflicts(&mut self, tx_type: &TxRecordType, tx_id: &u32, amount: &f64) {
+        if let Some(map) = &mut self.tx_conflict_map {
+            if tx_type.conflict_type() {
+                return;
+            }
 
-    fn deposit(&mut self, amount: &f64) {
-        if self.locked {
-            return;
+            if !map.contains_key(&tx_id) {
+                return;
+            }
+
+            if let Some(value) = map.get(&tx_id) {
+                if *value > 0.0 {
+                    return;
+                }
+            }
+
+            map.entry(tx_id.clone()).and_modify(|e| {
+                // note: need to apply the opposite sign when reversing the transaction
+                if *tx_type == TxRecordType::DEPOSIT {
+                    *e = *amount;
+                } else {
+                    *e = -(*amount);
+                }
+            });
+
+            println!(
+                "client conflict updated --> type: {}, client: {}, tx: {}, amount: {:?}",
+                tx_type.name(),
+                self.client_id,
+                tx_id,
+                amount
+            );
         }
-        // account.available += tx_reader.tx_record_amount().unwrap();
-        // account.total += tx_reader.tx_record_amount().unwrap();
-        // if map.contains(tx_reader.tx_record_tx()
-    }
-
-    fn widthdraw(&mut self, amount: &f64) {
-        // if account.available >= tx_reader.tx_record_amount().unwrap() {
-        //     account.available -= tx_reader.tx_record_amount().unwrap();
-        // }
     }
 }

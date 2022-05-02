@@ -124,7 +124,14 @@ pub trait TxQueue<T: Send + Sync + 'static> {
                 if let Some(entry) = q.pop() {
                     drop(q);
                     drop(mgq);
-                    let _ = Self::process_entry(&out_dir_path, &entry);
+                    let result = Self::process_entry(&out_dir_path, &entry);
+                    if result.is_err() {
+                        // change this so that each worker passes back Result<(), AppError>
+                        println!("worker {} failed. rolling back", wid);
+                        result.err().unwrap().show();
+                        tx.send(true).unwrap();
+                        return;
+                    }
                 }
 
                 // sleep
