@@ -2,7 +2,7 @@ use rust_decimal::prelude::*;
 use std::io::Read;
 use std::{collections::HashMap, fs};
 
-use super::tx_record::TxRecordType;
+use super::tx_record::{TxRecordReader, TxRecordType};
 
 #[derive(Debug, Clone)]
 pub struct TxConflictState {
@@ -13,23 +13,64 @@ pub struct TxConflictState {
 
 #[derive(Debug, Clone)]
 pub struct TxConflict {
-    pub txt_map: HashMap<u32, TxConflictState>,
     pub map: HashMap<u32, TxConflictState>,
 }
 
 impl TxConflict {
     pub fn new(tx_dir: &str) -> Self {
-        Self {
-            txt_map: Self::load_txt_map(tx_dir),
+        let mut s = Self {
             map: HashMap::new(),
+        };
+        s.load_csv_map(tx_dir);
+        s.load_txt_map(tx_dir);
+        s
+    }
+
+    fn load_csv_map(&mut self, tx_dir: &str) {
+        let opt = Self::conflict_paths(tx_dir, "csv");
+        if opt.is_none() {
+            return;
+        }
+
+        let paths = opt.unwrap();
+        let result = TxRecordReader::new(&paths.get(0).unwrap());
+        if result.is_err() {
+            return;
+        }
+        let mut tx_reader = result.unwrap();
+        let mut initial_loop = true;
+
+        for path in paths {
+            if initial_loop {
+                let result = tx_reader.set_reader(&path);
+                if result.is_err() {
+                    return;
+                }
+                initial_loop = false;
+            }
+
+            while tx_reader.next_record() {
+                if let Some(_e) = tx_reader.error() {
+                    return;
+                }
+                if !self.map.contains_key(tx_reader.tx_record_tx()) {
+                    self.map.insert(
+                        tx_reader.tx_record_tx().clone(),
+                        TxConflictState {
+                            state: TxRecordType::NONE,
+                            tx_type: tx_reader.tx_record_type().clone(),
+                            amount: tx_reader.tx_record_amount().clone(),
+                        },
+                    );
+                }
+            }
         }
     }
 
-    fn load_txt_map(tx_dir: &str) -> HashMap<u32, TxConflictState> {
-        let mut map: HashMap<u32, TxConflictState> = HashMap::new();
+    fn load_txt_map(&mut self, tx_dir: &str) {
         let paths = Self::conflict_paths(tx_dir, "txt");
         if paths.is_none() {
-            return map;
+            return;
         }
 
         for path in paths.unwrap() {
@@ -46,8 +87,8 @@ impl TxConflict {
                 let list = s.replace("[", "").replace("]", "").replace(" ", "");
                 for x in list.split(",") {
                     let tx_id = x.to_string().parse::<u32>().unwrap();
-                    if !map.contains_key(&tx_id) {
-                        map.insert(
+                    if !self.map.contains_key(&tx_id) {
+                        self.map.insert(
                             tx_id,
                             TxConflictState {
                                 state: TxRecordType::NONE,
@@ -59,12 +100,10 @@ impl TxConflict {
                 }
             }
         }
-
-        map
     }
 
     fn conflict_paths(tx_dir: &str, ext: &str) -> Option<Vec<String>> {
-        let conflict_txt_dir = [tx_dir, "txt"].join("/");
+        let conflict_txt_dir = [tx_dir, ext].join("/");
         let paths = fs::read_dir(&conflict_txt_dir);
 
         if paths.is_err() {
@@ -99,32 +138,32 @@ impl TxConflict {
         Some(conflict_paths)
     }
 
-    pub fn update_conflicts(&mut self, tx_id: &u32, tx_type: &TxRecordType, amount: &Decimal) {
-        if tx_type.conflict_type() {
-            return;
-        }
+    // pub fn update_conflicts(&mut self, tx_id: &u32, tx_type: &TxRecordType, amount: &Decimal) {
+    //     if tx_type.conflict_type() {
+    //         return;
+    //     }
 
-        if !self.map.contains_key(&tx_id) {
-            return;
-        }
+    //     if !self.map.contains_key(&tx_id) {
+    //         return;
+    //     }
 
-        if let Some(conflict) = self.map.get(&tx_id) {
-            if conflict.tx_type != TxRecordType::NONE {
-                return;
-            }
-        }
+    //     if let Some(conflict) = self.map.get(&tx_id) {
+    //         if conflict.tx_type != TxRecordType::NONE {
+    //             return;
+    //         }
+    //     }
 
-        self.map.entry(tx_id.clone()).and_modify(|e| {
-            e.tx_type = tx_type.clone();
-            e.amount = *amount;
-        });
+    //     self.map.entry(tx_id.clone()).and_modify(|e| {
+    //         e.tx_type = tx_type.clone();
+    //         e.amount = *amount;
+    //     });
 
-        // println!(
-        //     "client conflict updated --> type: {}, client: {}, tx: {}, amount: {:?}",
-        //     tx_type.name(),
-        //     self.client_id,
-        //     tx_id,
-        //     amount
-        // );
-    }
+    //     // println!(
+    //     //     "client conflict updated --> type: {}, client: {}, tx: {}, amount: {:?}",
+    //     //     tx_type.name(),
+    //     //     self.client_id,
+    //     //     tx_id,
+    //     //     amount
+    //     // );
+    // }
 }
