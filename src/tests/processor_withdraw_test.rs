@@ -95,7 +95,7 @@ fn process_withdraw_test() {
     // check balance
     let summary_base = [SUMMARY_DIR, "withdraw"].join("/");
 
-    let account = Account::new(1, &summary_base);
+    let account = Account::new(1, &summary_base, &cluster_base);
     assert_eq!(account.client_id, 1);
     assert_eq!(account.available, Decimal::new(9, 0));
     assert_eq!(account.held, Decimal::new(0, 0));

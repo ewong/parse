@@ -205,6 +205,7 @@ impl TxRecordReader {
     fn csv_reader(csv_path: &str) -> Result<Reader<File>, AppError> {
         let f = fs::File::open(&csv_path)
             .map_err(|e| AppError::new(PATH, "csv_reader", "00", &e.to_string()))?;
+        // println!("size of file: {}", f.metadata().unwrap().len());
         Ok(csv::ReaderBuilder::new()
             .has_headers(true)
             .flexible(true)

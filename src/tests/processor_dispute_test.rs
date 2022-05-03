@@ -85,7 +85,7 @@ fn process_dispute_base_test() {
     // check balance
     let summary_base = [SUMMARY_DIR, "dispute_base"].join("/");
 
-    let account = Account::new(1, &summary_base);
+    let account = Account::new(1, &summary_base, &cluster_base);
     assert_eq!(account.client_id, 1);
     assert_eq!(account.available, Decimal::new(1, 0));
     assert_eq!(account.held, Decimal::new(1, 0));
@@ -111,7 +111,7 @@ fn process_dispute_tx_dne_test() {
 
     let result = Processor::new("src/tests/csv/dispute_tx_dne.csv");
     assert!(result.is_ok());
-    
+
     let p = result.unwrap();
     let result = p.process_csv(false);
     assert!(result.is_ok());
@@ -161,7 +161,7 @@ fn process_dispute_tx_dne_test() {
     // check balance
     let summary_base = [SUMMARY_DIR, "dispute_tx_dne"].join("/");
 
-    let account = Account::new(1, &summary_base);
+    let account = Account::new(1, &summary_base, &cluster_base);
     assert_eq!(account.client_id, 1);
     assert_eq!(account.available, Decimal::new(14, 0));
     assert_eq!(account.held, Decimal::new(0, 0));

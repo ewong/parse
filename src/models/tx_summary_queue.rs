@@ -144,8 +144,7 @@ where
             return Ok(());
         }
 
-        let mut account = Account::new(entry.client_id(), ACCOUNT_DIR);
-        account.load_tx_conflict_map(entry.dir_path());
+        let mut account = Account::new(entry.client_id(), ACCOUNT_DIR, entry.dir_path());
         let mut tx_reader = TxRecordReader::new(&file_paths.get(0).unwrap())?;
         let mut initial_loop = true;
 
