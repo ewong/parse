@@ -3,18 +3,21 @@ use std::collections::{HashMap, HashSet};
 use std::fs;
 
 use crate::lib::error::AppError;
+use super::tx_record::TxRecordType;
 
 const PATH: &str = "model/tx_cluster";
 
 pub trait TxClusterData: Send + Sync + 'static {
     fn block(&self) -> usize;
     fn tx_map(&self) -> &HashMap<u16, Vec<ByteRecord>>;
+    fn tx_deposit_withdraw_map(&self) -> &HashMap<u16, HashMap<u32, usize>>;
     fn tx_conflict_map(&self) -> &HashMap<u16, HashSet<u32>>;
 }
 
 pub struct TxCluster {
     block: usize,
     tx_map: HashMap<u16, Vec<ByteRecord>>,
+    tx_deposit_withdraw_map: HashMap<u16, HashMap<u32, usize>>,
     tx_conflict_map: HashMap<u16, HashSet<u32>>,
 }
 
@@ -23,23 +26,52 @@ impl TxCluster {
         Self {
             block,
             tx_map: HashMap::new(),
+            tx_deposit_withdraw_map: HashMap::new(),
             tx_conflict_map: HashMap::new(),
         }
     }
 
-    pub fn add_tx(&mut self, client_id: &u16, byte_record: &ByteRecord) {
+    pub fn add_tx(
+        &mut self,
+        tx_type: &TxRecordType,
+        client_id: &u16,
+        tx_id: &u32,
+        byte_record: &ByteRecord,
+    ) {
         if self.tx_map.contains_key(client_id) {
             self.tx_map.entry(client_id.clone()).and_modify(|e| {
+                if tx_type.conflict_type() {
+                    if self.tx_deposit_withdraw_map.contains_key(client_id) {
+                        self.tx_deposit_withdraw_map
+                            .entry(client_id.clone())
+                            .and_modify(|e| {
+                                e.insert(tx_id.clone(), e.len());
+                            });
+                    } else {
+                        let mut map = HashMap::new();
+                        map.insert(tx_id.clone(), e.len());
+                        self.tx_deposit_withdraw_map.insert(client_id.clone(), map);
+                    }
+                }
                 e.push(byte_record.clone());
             });
-            return;
+        } else {
+            let mut v = Vec::new();
+            v.push(byte_record.clone());
+            self.tx_map.insert(client_id.clone(), v);
+            if tx_type.conflict_type() {
+                let mut map = HashMap::new();
+                map.insert(tx_id.clone(), 0);
+                self.tx_deposit_withdraw_map.insert(client_id.clone(), map);
+            }
         }
-        let mut v = Vec::new();
-        v.push(byte_record.clone());
-        self.tx_map.insert(client_id.clone(), v);
     }
 
-    pub fn add_conflict(&mut self, client_id: &u16, tx_id: &u32) {
+    pub fn add_conflict(&mut self, tx_type: &TxRecordType, client_id: &u16, tx_id: &u32) {
+        if !tx_type.conflict_type() {
+            return;
+        }
+
         if self.tx_conflict_map.contains_key(client_id) {
             self.tx_conflict_map
                 .entry(client_id.clone())
@@ -61,6 +93,10 @@ impl TxClusterData for TxCluster {
 
     fn tx_map(&self) -> &HashMap<u16, Vec<ByteRecord>> {
         &self.tx_map
+    }
+
+    fn tx_deposit_withdraw_map(&self) -> &HashMap<u16, HashMap<u32, usize>> {
+        &self.tx_deposit_withdraw_map
     }
 
     fn tx_conflict_map(&self) -> &HashMap<u16, HashSet<u32>> {

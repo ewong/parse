@@ -11,7 +11,7 @@ use crate::lib::tx_queue::TxQueue;
 
 const PATH: &str = "model/processor";
 const BLOCK_SIZE: usize = 1_000_000;
-const MIN_CLUSTER_THREADS: u16 = 3;
+const MIN_CLUSTER_THREADS: u16 = 4;
 const MAX_SUMMARY_THREADS: u16 = 64;
 const MIN_SUMMARY_THREADS: u16 = 4;
 
@@ -70,10 +70,18 @@ impl<'a> Processor<'a> {
         let mut rows: usize = 0;
 
         while tx_reader.next_record() {
-            tx_cluster.add_tx(tx_reader.tx_record_client(), tx_reader.byte_record());
-            if tx_reader.tx_record_type().conflict_type() {
-                tx_cluster.add_conflict(tx_reader.tx_record_client(), tx_reader.tx_record_tx());
-            }
+            tx_cluster.add_tx(
+                tx_reader.tx_record_type(),
+                tx_reader.tx_record_client(),
+                tx_reader.tx_record_tx(),
+                tx_reader.byte_record(),
+            );
+
+            tx_cluster.add_conflict(
+                tx_reader.tx_record_type(),
+                tx_reader.tx_record_client(),
+                tx_reader.tx_record_tx(),
+            );
 
             rows += 1;
             if rows == BLOCK_SIZE {
