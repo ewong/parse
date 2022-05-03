@@ -10,7 +10,7 @@ const MTX_NUM_TRIES: u8 = 3;
 const MTX_SLEEP_DURATION: u64 = 20;
 
 pub trait TxQueue<T: Send + Sync + 'static> {
-    fn num_threads() -> u16;
+    fn num_threads(&self) -> u16;
     fn thread_sleep_duration() -> u64;
     fn started(&self) -> bool;
     fn set_started(&mut self, value: bool);
@@ -37,7 +37,7 @@ pub trait TxQueue<T: Send + Sync + 'static> {
 
             // block until all threads are done
             if let Some(rx) = self.rx() {
-                for _ in 0..Self::num_threads() {
+                for _ in 0..self.num_threads() {
                     rx.recv().unwrap();
                 }
             }
@@ -92,7 +92,7 @@ pub trait TxQueue<T: Send + Sync + 'static> {
         let (s, r) = unbounded();
         self.set_rx(Some(r));
 
-        for _wid in 0..Self::num_threads() {
+        for _wid in 0..self.num_threads() {
             let mtx_q = Arc::clone(&self.mtx_q());
             let mtx_shutdown = Arc::clone(&self.mtx_shutdown());
             let out_dir_path = self.out_dir().to_owned();

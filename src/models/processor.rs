@@ -11,6 +11,9 @@ use crate::lib::tx_queue::TxQueue;
 
 const PATH: &str = "model/processor";
 const BLOCK_SIZE: usize = 1_000_000;
+const MIN_CLUSTER_THREADS: u16 = 3;
+const MAX_SUMMARY_THREADS: u16 = 64;
+const MIN_SUMMARY_THREADS: u16 = 4;
 
 pub struct Processor<'a> {
     source_csv_path: &'a str,
@@ -60,7 +63,7 @@ impl<'a> Processor<'a> {
     fn cluster_transactions_by_client(&self) -> Result<(), AppError> {
         let mut tx_cluster = TxCluster::new(0);
         let mut tx_reader = TxRecordReader::new(&self.source_csv_path)?;
-        let mut q = TxClusterQueue::new(&self.csv_cluster_dir);
+        let mut q = TxClusterQueue::new(&self.csv_cluster_dir, MIN_CLUSTER_THREADS);
 
         q.start()?;
         let mut block: usize = 0;
@@ -123,7 +126,15 @@ impl<'a> Processor<'a> {
 
     fn summarize_transactions_by_client(&self) -> Result<(), AppError> {
         let cluster_paths = TxClusterPath::paths(&self.csv_cluster_dir)?;
-        let mut q = TxSummaryQueue::new(&self.csv_summary_dir, cluster_paths);
+
+        let num_summary_threads: u16;
+        if cluster_paths.len() > u16::MAX as usize {
+            num_summary_threads = MAX_SUMMARY_THREADS;
+        } else {
+            num_summary_threads = ((cluster_paths.len() as u16) / 1000) + MIN_SUMMARY_THREADS;
+        }
+
+        let mut q = TxSummaryQueue::new(&self.csv_summary_dir, cluster_paths, num_summary_threads);
         q.start()?;
         q.stop()?;
         Ok(())

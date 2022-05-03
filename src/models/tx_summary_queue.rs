@@ -13,13 +13,13 @@ use super::tx_cluster::TxClusterPathData;
 const PATH: &str = "model/client_queue";
 const FN_PROCESS_ENTRY: &str = "process_entry";
 
-const NUM_THREADS: u16 = 64;
 const THREAD_SLEEP_DURATION: u64 = 100;
 
 pub struct TxSummaryQueue<T> {
     started: bool,
     rx: Option<Receiver<bool>>,
-    out_dir: String,
+    num_threads: u16,
+    summary_dir: String,
     arc_shutdown: Arc<Mutex<bool>>,
     arc_q: Arc<Mutex<Vec<T>>>,
 }
@@ -28,11 +28,12 @@ impl<T> TxSummaryQueue<T>
 where
     T: TxClusterPathData,
 {
-    pub fn new(out_dir: &str, dir_paths: Vec<T>) -> Self {
+    pub fn new(summary_dir: &str, dir_paths: Vec<T>, num_threads: u16) -> Self {
         Self {
             started: false,
             rx: None,
-            out_dir: out_dir.to_owned(),
+            num_threads,
+            summary_dir: summary_dir.to_owned(),
             arc_shutdown: Arc::new(Mutex::new(true)),
             arc_q: Arc::new(Mutex::new(dir_paths)),
         }
@@ -97,8 +98,8 @@ impl<T> TxQueue<T> for TxSummaryQueue<T>
 where
     T: TxClusterPathData,
 {
-    fn num_threads() -> u16 {
-        NUM_THREADS
+    fn num_threads(&self) -> u16 {
+        self.num_threads
     }
 
     fn thread_sleep_duration() -> u64 {
@@ -130,7 +131,7 @@ where
     }
 
     fn out_dir(&self) -> &str {
-        &self.out_dir
+        &self.summary_dir
     }
 
     fn process_entry(out_dir: &str, entry: &T) -> Result<(), AppError> {

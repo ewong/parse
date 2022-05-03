@@ -6,12 +6,12 @@ use super::tx_record::TxRecordWriter;
 use crate::lib::error::AppError;
 use crate::lib::tx_queue::TxQueue;
 
-const NUM_THREADS: u16 = 3;
 const THREAD_SLEEP_DURATION: u64 = 500;
 
 pub struct TxClusterQueue<E> {
     started: bool,
     rx: Option<Receiver<bool>>,
+    num_threads: u16,
     csv_cluster_dir: String,
     arc_shutdown: Arc<Mutex<bool>>,
     arc_q: Arc<Mutex<Vec<E>>>,
@@ -21,10 +21,11 @@ impl<E> TxClusterQueue<E>
 where
     E: TxClusterData,
 {
-    pub fn new(csv_cluster_dir: &str) -> Self {
+    pub fn new(csv_cluster_dir: &str, num_threads: u16) -> Self {
         Self {
             started: false,
             rx: None,
+            num_threads,
             csv_cluster_dir: csv_cluster_dir.to_owned(),
             arc_shutdown: Arc::new(Mutex::new(true)),
             arc_q: Arc::new(Mutex::new(Vec::new())),
@@ -36,8 +37,8 @@ impl<T> TxQueue<T> for TxClusterQueue<T>
 where
     T: TxClusterData,
 {
-    fn num_threads() -> u16 {
-        NUM_THREADS
+    fn num_threads(&self) -> u16 {
+        self.num_threads
     }
 
     fn thread_sleep_duration() -> u64 {
