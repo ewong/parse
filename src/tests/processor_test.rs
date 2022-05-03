@@ -1,6 +1,8 @@
 use rust_decimal::Decimal;
 
 use super::helpers::helper::TestHelper;
+use crate::lib::constants::{CLUSTER_DIR, SUMMARY_DIR};
+use crate::models::account::Account;
 use crate::models::processor::Processor;
 use crate::models::tx_record::{TxRecordReader, TxRecordType};
 
@@ -9,7 +11,7 @@ use crate::models::tx_record::{TxRecordReader, TxRecordType};
     - tx doesn't exist
     - tx exists
     - dispute on a disputed account
-    - dispute on a resolved account that 
+    - dispute on a resolved account that
 
     resolve
     - tx doesn't exist
@@ -45,8 +47,8 @@ fn process_deposit_test() {
     assert!(p.process_csv(false).is_ok());
 
     // check output files
-    let base = "data/deposit";
-    let result = TxRecordReader::new(&[base, "1", "0.csv"].join("/"));
+    let base = [CLUSTER_DIR, "deposit"].join("/");
+    let result = TxRecordReader::new(&[&base, "1", "0.csv"].join("/"));
     assert!(result.is_ok());
 
     let mut reader = result.unwrap();
@@ -69,11 +71,15 @@ fn process_deposit_test() {
     assert_eq!(reader.tx_record_tx(), &8);
     assert_eq!(reader.tx_record_amount(), &Decimal::new(2, 0));
 
+    // check balance
+    let account_base = [SUMMARY_DIR, "deposit"].join("/");
+    let _account = Account::new(1, &account_base);
+
     // -------- //
     // client 2 //
     // -------- //
 
-    assert!(reader.set_reader(&[base, "2", "0.csv"].join("/")).is_ok());
+    assert!(reader.set_reader(&[&base, "2", "0.csv"].join("/")).is_ok());
 
     // deposit,2,2,1
     assert!(reader.next_record());
@@ -93,7 +99,7 @@ fn process_deposit_test() {
     // client 3 //
     // -------- //
 
-    assert!(reader.set_reader(&[base, "3", "0.csv"].join("/")).is_ok());
+    assert!(reader.set_reader(&[&base, "3", "0.csv"].join("/")).is_ok());
 
     // deposit,3,3,1
     assert!(reader.next_record());
@@ -113,7 +119,7 @@ fn process_deposit_test() {
     // client 4 //
     // -------- //
 
-    assert!(reader.set_reader(&[base, "4", "0.csv"].join("/")).is_ok());
+    assert!(reader.set_reader(&[&base, "4", "0.csv"].join("/")).is_ok());
 
     // deposit,4,4,1
     assert!(reader.next_record());
@@ -132,7 +138,7 @@ fn process_deposit_test() {
     // test account balances
     // available should be 3 for all clients
 
-    TestHelper::remove_dir("data/deposit");
+    TestHelper::remove_dir(&base);
 }
 
 #[test]
@@ -156,8 +162,8 @@ fn process_withdraw_test() {
     assert!(result.is_ok());
 
     // check output files
-    let base = "data/withdraw";
-    let result = TxRecordReader::new(&[base, "1", "0.csv"].join("/"));
+    let base = [CLUSTER_DIR, "withdraw"].join("/");
+    let result = TxRecordReader::new(&[&base, "1", "0.csv"].join("/"));
     assert!(result.is_ok());
 
     let mut reader = result.unwrap();
@@ -221,7 +227,7 @@ fn process_withdraw_test() {
     // test account balances
     // available should be 9
 
-    TestHelper::remove_dir("data/withdraw");
+    TestHelper::remove_dir(&base);
 }
 
 // fn process_dispute_test() {

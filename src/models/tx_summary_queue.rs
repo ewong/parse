@@ -2,6 +2,7 @@ use crossbeam_channel::Receiver;
 use std::fs;
 use std::sync::{Arc, Mutex};
 
+use crate::lib::constants::ACCOUNT_DIR;
 use crate::lib::error::AppError;
 use crate::lib::tx_queue::TxQueue;
 use crate::models::tx_record::TxRecordReader;
@@ -139,7 +140,8 @@ where
             return Ok(());
         }
 
-        let mut account = Account::new(entry.client_id(), entry.dir_path())?;
+        let mut account = Account::new(entry.client_id(), ACCOUNT_DIR)?;
+        account.load_tx_conflict_map(entry.dir_path());
         let mut tx_reader = TxRecordReader::new(&file_paths.get(0).unwrap())?;
         let mut initial_loop = true;
 

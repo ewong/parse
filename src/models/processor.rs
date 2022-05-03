@@ -5,14 +5,12 @@ use super::tx_cluster_queue::TxClusterQueue;
 use super::tx_record::TxRecordReader;
 use super::tx_summary::TxSummary;
 use super::tx_summary_queue::TxSummaryQueue;
+use crate::lib::constants::{CLUSTER_DIR, SUMMARY_DIR};
 use crate::lib::error::AppError;
 use crate::lib::timer::Timer;
 use crate::lib::tx_queue::TxQueue;
 
 const PATH: &str = "model/processor";
-const OUT_DIR: &str = "data";
-const ACCOUNT_DIR: &str = "data/accounts";
-
 const BLOCK_SIZE: usize = 1_000_000;
 
 pub struct Processor<'a> {
@@ -26,11 +24,11 @@ impl<'a> Processor<'a> {
 
     pub fn process_csv(&self, cleanup: bool) -> Result<(), AppError> {
         let timer = Timer::start();
-        let working_dir = self.file_dir(OUT_DIR)?;
+        let working_dir = self.file_dir(CLUSTER_DIR)?;
         self.cluster_transactions_by_client(&working_dir)?;
         self.summarize_transactions_by_client(&working_dir)?;
         if cleanup {
-            let account_dir = self.file_dir(ACCOUNT_DIR)?;
+            let account_dir = self.file_dir(SUMMARY_DIR)?;
             let _ = fs::remove_dir_all(working_dir);
             let _ = fs::remove_dir_all(account_dir);
         }
@@ -124,7 +122,7 @@ impl<'a> Processor<'a> {
 
     fn summarize_transactions_by_client(&self, working_dir: &str) -> Result<(), AppError> {
         let summaries = TxSummary::summaries(working_dir)?;
-        let account_dir = self.file_dir(ACCOUNT_DIR)?;
+        let account_dir = self.file_dir(SUMMARY_DIR)?;
         let mut q = TxSummaryQueue::new(&account_dir, summaries);
         q.start()?;
         q.stop()?;

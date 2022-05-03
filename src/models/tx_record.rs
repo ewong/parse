@@ -6,6 +6,7 @@ use std::fs::{self, File};
 use std::io::Write;
 use std::str;
 
+use crate::lib::constants::FN_NEW;
 use crate::lib::error::AppError;
 
 const PATH: &str = "models/tx_record";
@@ -17,7 +18,6 @@ const CLIENT_COL: &str = "client";
 const TX_COL: &str = "tx";
 const AMOUNT_COL: &str = "amount";
 
-const FN_NEW: &str = "new";
 const FN_WRITE_RECORDS: &str = "writer_records";
 
 const B_DEPOSIT: &[u8] = b"deposit";

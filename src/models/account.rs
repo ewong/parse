@@ -1,9 +1,11 @@
+use csv::ByteRecord;
 use rust_decimal::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::io::Read;
 use std::{collections::HashMap, fs};
 
 use super::tx_record::TxRecordType;
+use crate::lib::constants::FN_NEW;
 use crate::lib::error::AppError;
 
 const PATH: &str = "model/account";
@@ -30,17 +32,116 @@ pub struct Account {
 }
 
 impl Account {
-    // todo: check to see the client has an existing account
-    pub fn new(client_id: u16, tx_dir: &str) -> Result<Self, AppError> {
-        let tx_conflict_map = Self::load_tx_id_conflict_map(tx_dir);
-        Ok(Self {
+    pub fn new(client_id: u16, account_dir: &str) -> Result<Self, AppError> {
+        let result = fs::File::open(&[account_dir, "/", &client_id.to_string(), ".csv"].join(""));
+        if result.is_err() {
+            return Ok(Self::default_instance(client_id));
+        }
+
+        let f = result.unwrap();
+        let mut reader = csv::Reader::from_reader(f);
+        let headers = reader
+            .byte_headers()
+            .map_err(|e| AppError::new(PATH, FN_NEW, "01", &e.to_string()))?
+            .clone();
+
+        let mut byte_record = ByteRecord::new();
+        let result = reader.read_byte_record(&mut byte_record);
+        if result.is_err() {
+            return Ok(Self::default_instance(client_id));
+        }
+
+        if byte_record.len() == 0 {
+            return Ok(Self::default_instance(client_id));
+        }
+
+        let result = byte_record.deserialize::<Account>(Some(&headers));
+
+        if result.is_err() {
+            return Ok(Self::default_instance(client_id));
+        }
+
+        Ok(result.unwrap())
+    }
+
+    fn default_instance(client_id: u16) -> Self {
+        Self {
             client_id,
             available: Decimal::new(0, 0),
             held: Decimal::new(0, 0),
             total: Decimal::new(0, 0),
             locked: false,
-            tx_conflict_map,
-        })
+            tx_conflict_map: None,
+        }
+    }
+
+    pub fn load_tx_conflict_map(&mut self, tx_dir: &str) {
+        let conflict_dir = [tx_dir, "conflicts"].join("/");
+        let paths = fs::read_dir(&conflict_dir);
+
+        if paths.is_err() {
+            return;
+        }
+
+        let conflict_paths: Vec<String> = paths
+            .unwrap()
+            .map(|e| {
+                if e.is_err() {
+                    return "".to_string();
+                }
+
+                let path = e.unwrap();
+                if path.path().file_name().is_none() {
+                    return "".to_string();
+                }
+
+                if !path.path().is_file() {
+                    return "".to_string();
+                }
+
+                path.path().display().to_string()
+            })
+            .filter(|s| s.len() > 0)
+            .collect();
+
+        if conflict_paths.len() == 0 {
+            return;
+        }
+
+        let mut map: HashMap<u32, TxConflict> = HashMap::new();
+        for path in conflict_paths {
+            let result = fs::File::open(&path);
+            if result.is_err() {
+                continue;
+            }
+
+            let mut f = result.unwrap();
+            let mut s = String::new();
+            let result = f.read_to_string(&mut s);
+
+            if result.is_ok() {
+                let list = s.replace("{", "").replace("}", "").replace(" ", "");
+                for x in list.split(",") {
+                    let tx_id = x.to_string().parse::<u32>().unwrap();
+                    if !map.contains_key(&tx_id) {
+                        map.insert(
+                            tx_id,
+                            TxConflict {
+                                state: TxRecordType::NONE,
+                                tx_type: TxRecordType::NONE,
+                                amount: Decimal::new(0, 0),
+                            },
+                        );
+                    }
+                }
+            }
+        }
+
+        if map.len() == 0 {
+            return;
+        }
+
+        self.tx_conflict_map = Some(map);
     }
 
     pub fn handle_tx(&mut self, tx_type: &TxRecordType, tx_id: &u32, amount: &Decimal) {
@@ -157,75 +258,6 @@ impl Account {
             .map_err(|e| AppError::new(PATH, FN_WRITE_CSV, "04", &e.to_string()))?;
 
         Ok(())
-    }
-
-    fn load_tx_id_conflict_map(tx_dir: &str) -> Option<HashMap<u32, TxConflict>> {
-        let conflict_dir = [tx_dir, "conflicts"].join("/");
-        let paths = fs::read_dir(&conflict_dir);
-
-        if paths.is_err() {
-            return None;
-        }
-
-        let conflict_paths: Vec<String> = paths
-            .unwrap()
-            .map(|e| {
-                if e.is_err() {
-                    return "".to_string();
-                }
-
-                let path = e.unwrap();
-                if path.path().file_name().is_none() {
-                    return "".to_string();
-                }
-
-                if !path.path().is_file() {
-                    return "".to_string();
-                }
-
-                path.path().display().to_string()
-            })
-            .filter(|s| s.len() > 0)
-            .collect();
-
-        if conflict_paths.len() == 0 {
-            return None;
-        }
-
-        let mut map: HashMap<u32, TxConflict> = HashMap::new();
-        for path in conflict_paths {
-            let result = fs::File::open(&path);
-            if result.is_err() {
-                continue;
-            }
-
-            let mut f = result.unwrap();
-            let mut s = String::new();
-            let result = f.read_to_string(&mut s);
-
-            if result.is_ok() {
-                let list = s.replace("{", "").replace("}", "").replace(" ", "");
-                for x in list.split(",") {
-                    let tx_id = x.to_string().parse::<u32>().unwrap();
-                    if !map.contains_key(&tx_id) {
-                        map.insert(
-                            tx_id,
-                            TxConflict {
-                                state: TxRecordType::NONE,
-                                tx_type: TxRecordType::NONE,
-                                amount: Decimal::new(0, 0),
-                            },
-                        );
-                    }
-                }
-            }
-        }
-
-        if map.len() == 0 {
-            return None;
-        }
-
-        Some(map)
     }
 
     fn update_conflicts(&mut self, tx_id: &u32, tx_type: &TxRecordType, amount: &Decimal) {
