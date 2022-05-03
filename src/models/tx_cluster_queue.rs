@@ -94,8 +94,19 @@ where
                 wtr.set_writer(&dir_path, &file_name)?;
                 wtr.write_records(records)?;
                 if let Some(set) = entry.tx_conflict_map().get(client_id) {
-                    let conflict_dir = [out_dir, &client_id.to_string(), "conflicts"].join("/");
-                    wtr.write_conflicted_tx_ids(&conflict_dir, &file_name, set)?;
+                    if let Some(deposit_withdraw_map) =
+                        entry.tx_deposit_withdraw_map().get(client_id)
+                    {
+                        // let conflict_dir = [out_dir, &client_id.to_string(), "conflicts"].join("/");
+                        // wtr.write_conflicted_tx_ids(&conflict_dir, &file_name, set)?;
+                        wtr.write_conflicts(
+                            &dir_path,
+                            &file_name,
+                            set,
+                            deposit_withdraw_map,
+                            records,
+                        )?;
+                    }
                 }
             }
         }

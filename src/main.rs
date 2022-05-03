@@ -22,7 +22,7 @@ fn main() {
     }
 
     let p = result.unwrap();
-    if let Err(err) = p.process_csv(true) {
+    if let Err(err) = p.process_csv(false) {
         err.show();
     }
 }

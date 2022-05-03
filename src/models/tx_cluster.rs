@@ -40,7 +40,7 @@ impl TxCluster {
     ) {
         if self.tx_map.contains_key(client_id) {
             self.tx_map.entry(client_id.clone()).and_modify(|e| {
-                if tx_type.conflict_type() {
+                if !tx_type.conflict_type() {
                     if self.tx_deposit_withdraw_map.contains_key(client_id) {
                         self.tx_deposit_withdraw_map
                             .entry(client_id.clone())
@@ -59,7 +59,7 @@ impl TxCluster {
             let mut v = Vec::new();
             v.push(byte_record.clone());
             self.tx_map.insert(client_id.clone(), v);
-            if tx_type.conflict_type() {
+            if !tx_type.conflict_type() {
                 let mut map = HashMap::new();
                 map.insert(tx_id.clone(), 0);
                 self.tx_deposit_withdraw_map.insert(client_id.clone(), map);
