@@ -189,10 +189,10 @@ impl Account {
                                 e.state = TxRecordType::DISPUTE;
                                 self.held += e.amount;
                                 self.available -= e.amount;
-                                println!(
-                                    "dispute --> tx_id: {}, client {}, available: {}, held: {}, total: {}, locked: {}",
-                                    tx_id, self.client_id, self.available, self.held, self.total, self.locked
-                                );
+                                // println!(
+                                //     "dispute --> tx_id: {}, client {}, available: {}, held: {}, total: {}, locked: {}",
+                                //     tx_id, self.client_id, self.available, self.held, self.total, self.locked
+                                // );
                             }
                         });
                     }
@@ -207,13 +207,13 @@ impl Account {
                     if map.contains_key(tx_id) {
                         map.entry(tx_id.clone()).and_modify(|e| {
                             if e.state == TxRecordType::DISPUTE {
+                                e.state = TxRecordType::RESOLVE;
                                 self.held -= e.amount;
                                 self.available += e.amount;
-                                e.state = TxRecordType::NONE;
-                                println!(
-                                    "resolve --> tx_id: {}, client {}, available: {}, held: {}, total: {}, locked: {}",
-                                    tx_id, self.client_id, self.available, self.held, self.total, self.locked
-                                );
+                                // println!(
+                                //     "resolve --> tx_id: {}, client {}, available: {}, held: {}, total: {}, locked: {}",
+                                //     tx_id, self.client_id, self.available, self.held, self.total, self.locked
+                                // );
                             }
                         });
                     }
@@ -228,10 +228,10 @@ impl Account {
                     if map.contains_key(tx_id) {
                         map.entry(tx_id.clone()).and_modify(|e| {
                             if e.state == TxRecordType::DISPUTE {
+                                e.state = TxRecordType::CHARGEBACK;
                                 self.held -= e.amount;
                                 self.total -= e.amount;
                                 self.locked = true;
-                                e.state = TxRecordType::CHARGEBACK;
                                 // println!(
                                 //     "chargeback --> tx_id: {}, client {}, available: {}, held: {}, total: {}, locked: {}",
                                 //     tx_id, self.client_id, self.available, self.held, self.total, self.locked
