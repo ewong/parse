@@ -1,5 +1,5 @@
 use crossbeam_channel::Receiver;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, RwLock};
 
 use super::tx_cluster::TxClusterData;
 use super::tx_record::TxRecordWriter;
@@ -13,8 +13,8 @@ pub struct TxClusterQueue<E> {
     rx: Option<Receiver<bool>>,
     num_threads: u16,
     csv_cluster_dir: String,
-    arc_shutdown: Arc<Mutex<bool>>,
-    arc_q: Arc<Mutex<Vec<E>>>,
+    arc_shutdown: Arc<RwLock<bool>>,
+    arc_q: Arc<RwLock<Vec<E>>>,
 }
 
 impl<E> TxClusterQueue<E>
@@ -27,8 +27,8 @@ where
             rx: None,
             num_threads,
             csv_cluster_dir: csv_cluster_dir.to_owned(),
-            arc_shutdown: Arc::new(Mutex::new(true)),
-            arc_q: Arc::new(Mutex::new(Vec::new())),
+            arc_shutdown: Arc::new(RwLock::new(true)),
+            arc_q: Arc::new(RwLock::new(Vec::new())),
         }
     }
 }
@@ -55,11 +55,11 @@ where
         self.started = value;
     }
 
-    fn mtx_q(&self) -> &Arc<Mutex<Vec<T>>> {
+    fn mtx_q(&self) -> &Arc<RwLock<Vec<T>>> {
         &self.arc_q
     }
 
-    fn mtx_shutdown(&self) -> &Arc<Mutex<bool>> {
+    fn mtx_shutdown(&self) -> &Arc<RwLock<bool>> {
         &self.arc_shutdown
     }
 

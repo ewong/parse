@@ -1,5 +1,5 @@
 use crossbeam_channel::{unbounded, Receiver};
-use std::sync::{Arc, Mutex, MutexGuard};
+use std::sync::{Arc, RwLock};
 use std::thread;
 use std::time::Duration;
 
@@ -14,15 +14,15 @@ pub trait TxQueue<T: Send + Sync + 'static> {
     fn thread_sleep_duration() -> u64;
     fn started(&self) -> bool;
     fn set_started(&mut self, value: bool);
-    fn mtx_q(&self) -> &Arc<Mutex<Vec<T>>>;
-    fn mtx_shutdown(&self) -> &Arc<Mutex<bool>>;
+    fn mtx_q(&self) -> &Arc<RwLock<Vec<T>>>;
+    fn mtx_shutdown(&self) -> &Arc<RwLock<bool>>;
     fn rx(&self) -> &Option<Receiver<bool>>;
     fn set_rx(&mut self, rx: Option<Receiver<bool>>);
     fn out_dir(&self) -> &str;
     fn process_entry(out_dir: &str, entry: &T) -> Result<(), AppError>;
 
     fn start(&mut self) -> Result<(), AppError> {
-        if self.is_shutdown()? {
+        if !self.started() {
             self.set_started(true);
             self.set_shutdown(false)?;
             self.spawn_workers()?;
@@ -46,60 +46,57 @@ pub trait TxQueue<T: Send + Sync + 'static> {
     }
 
     fn add(&self, entry: T) -> Result<(), AppError> {
-        let mut mtx_q = self.get_queue()?;
-        let q = &mut (*mtx_q);
-        q.push(entry);
-        Ok(())
-    }
-
-    fn get_queue(&self) -> Result<MutexGuard<Vec<T>>, AppError> {
         for _ in 1..MTX_NUM_TRIES {
-            if let Ok(mtx_q) = self.mtx_q().lock() {
-                return Ok(mtx_q);
+            if let Ok(mtx_q) = &mut self.mtx_q().write() {
+                let q = &mut (*mtx_q);
+                q.push(entry);
+                println!("queue length: {}", q.len());
+                return Ok(());
             } else {
                 thread::sleep(Duration::from_millis(MTX_SLEEP_DURATION));
             }
         }
         let msg = "error accessing mtx_q lock";
-        Err(AppError::new(PATH, "get_queue", "00", msg))
+        return Err(AppError::new(PATH, "get_queue", "00", msg));
     }
 
-    fn get_shutdown(&self) -> Result<MutexGuard<bool>, AppError> {
+    fn set_shutdown(&self, value: bool) -> Result<(), AppError> {
         for _ in 1..MTX_NUM_TRIES {
-            if let Ok(mtx_shutdown) = self.mtx_shutdown().lock() {
-                return Ok(mtx_shutdown);
+            if let Ok(mut mtx_shutdown) = self.mtx_shutdown().write() {
+                *mtx_shutdown = value;
+                return Ok(());
             } else {
                 thread::sleep(Duration::from_millis(MTX_SLEEP_DURATION));
             }
         }
         let msg = "error accessing shutdown lock";
-        Err(AppError::new(PATH, "get_shutdown", "00", msg))
-    }
-
-    fn set_shutdown(&self, value: bool) -> Result<(), AppError> {
-        let mut mtx_shutdown = self.get_shutdown()?;
-        *mtx_shutdown = value;
-        Ok(())
+        return Err(AppError::new(PATH, "get_shutdown", "00", msg));
     }
 
     fn is_shutdown(&self) -> Result<bool, AppError> {
-        let mtx_shutdown = self.get_shutdown()?;
-        let result = *mtx_shutdown;
-        Ok(result)
+        for _ in 1..MTX_NUM_TRIES {
+            if let Ok(mtx_shutdown) = self.mtx_shutdown().read() {
+                return Ok(*mtx_shutdown);
+            } else {
+                thread::sleep(Duration::from_millis(MTX_SLEEP_DURATION));
+            }
+        }
+        let msg = "error accessing shutdown lock";
+        return Err(AppError::new(PATH, "get_shutdown", "00", msg));
     }
 
     fn spawn_workers(&mut self) -> Result<(), AppError> {
         let (s, r) = unbounded();
         self.set_rx(Some(r));
 
-        for _wid in 0..self.num_threads() {
+        for wid in 0..self.num_threads() {
             let mtx_q = Arc::clone(&self.mtx_q());
             let mtx_shutdown = Arc::clone(&self.mtx_shutdown());
             let out_dir_path = self.out_dir().to_owned();
             let tx = s.clone();
 
             thread::spawn(move || loop {
-                let res = mtx_q.lock();
+                let res = mtx_q.write();
                 if res.is_err() {
                     thread::sleep(Duration::from_millis(MTX_SLEEP_DURATION));
                     continue;
@@ -111,11 +108,11 @@ pub trait TxQueue<T: Send + Sync + 'static> {
                 if q.len() == 0 {
                     drop(q);
                     drop(mgq);
-                    if let Ok(shutdown) = mtx_shutdown.lock() {
+                    if let Ok(shutdown) = mtx_shutdown.read() {
                         if *shutdown {
-                            // println!("worker {} is shutdown", wid);
+                            println!("worker {} is shutdown", wid);
                             tx.send(true).unwrap();
-                            return;
+                            break;
                         }
                     }
                     continue;
@@ -127,17 +124,17 @@ pub trait TxQueue<T: Send + Sync + 'static> {
                     let result = Self::process_entry(&out_dir_path, &entry);
                     if result.is_err() {
                         // change this so that each worker passes back Result<(), AppError>
-                        // println!("worker {} failed. rolling back", wid);
+                        println!("worker {} failed. rolling back", wid);
                         result.err().unwrap().show();
                         tx.send(true).unwrap();
-                        return;
+                        break;
                     }
                 }
 
                 // sleep
                 thread::sleep(Duration::from_millis(Self::thread_sleep_duration()));
             });
-            // println!("spawned worker {}", wid);
+            println!("spawned worker {}", wid);
         }
 
         Ok(())

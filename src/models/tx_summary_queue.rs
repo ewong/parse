@@ -1,6 +1,6 @@
 use crossbeam_channel::Receiver;
 use std::fs;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, RwLock};
 
 use crate::lib::constants::ACCOUNT_DIR;
 use crate::lib::error::AppError;
@@ -20,8 +20,8 @@ pub struct TxSummaryQueue<T> {
     rx: Option<Receiver<bool>>,
     num_threads: u16,
     summary_dir: String,
-    arc_shutdown: Arc<Mutex<bool>>,
-    arc_q: Arc<Mutex<Vec<T>>>,
+    arc_shutdown: Arc<RwLock<bool>>,
+    arc_q: Arc<RwLock<Vec<T>>>,
 }
 
 impl<T> TxSummaryQueue<T>
@@ -34,8 +34,8 @@ where
             rx: None,
             num_threads,
             summary_dir: summary_dir.to_owned(),
-            arc_shutdown: Arc::new(Mutex::new(true)),
-            arc_q: Arc::new(Mutex::new(dir_paths)),
+            arc_shutdown: Arc::new(RwLock::new(true)),
+            arc_q: Arc::new(RwLock::new(dir_paths)),
         }
     }
 
@@ -114,11 +114,11 @@ where
         self.started = value;
     }
 
-    fn mtx_q(&self) -> &Arc<Mutex<Vec<T>>> {
+    fn mtx_q(&self) -> &Arc<RwLock<Vec<T>>> {
         &self.arc_q
     }
 
-    fn mtx_shutdown(&self) -> &Arc<Mutex<bool>> {
+    fn mtx_shutdown(&self) -> &Arc<RwLock<bool>> {
         &self.arc_shutdown
     }
 
