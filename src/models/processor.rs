@@ -49,12 +49,9 @@ impl<'a> Processor<'a> {
     }
 
     fn cluster_transactions_by_client(&self, working_dir: &str) -> Result<(), AppError> {
-        // let timer = Timer::start();
-
         let mut tx_cluster = TxCluster::new(0);
         let mut tx_reader = TxRecordReader::new(self.source_csv_path)?;
         let mut q = TxClusterQueue::new(working_dir);
-        // let mut block_timer = Timer::start();
 
         q.start()?;
         let mut block: usize = 0;

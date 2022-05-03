@@ -1,4 +1,4 @@
-use csv::{ByteRecord, Reader, Writer};
+use csv::{ByteRecord, Reader, Trim, Writer};
 use rust_decimal::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
@@ -70,17 +70,6 @@ impl TxRecordType {
     pub fn conflict_type(&self) -> bool {
         *self == Self::DISPUTE || *self == Self::RESOLVE || *self == Self::CHARGEBACK
     }
-
-    // pub fn name(&self) -> &str {
-    //     return match self {
-    //         Self::DEPOSIT => "deposit",
-    //         Self::WITHDRAW => "withdraw",
-    //         Self::DISPUTE => "dispute",
-    //         Self::RESOLVE => "resolve",
-    //         Self::CHARGEBACK => "chargeback",
-    //         _ => "none",
-    //     };
-    // }
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
@@ -93,19 +82,23 @@ pub struct TxRecord<'a> {
     pub tx_id: u32,
     #[serde(
         rename(deserialize = "amount", serialize = "amount"),
-        default = "default_amount",
         with = "rust_decimal::serde::str"
     )]
     pub amount: Decimal,
 }
 
-fn default_amount() -> Decimal {
-    Decimal::new(0, 0)
+#[derive(Deserialize, Serialize)]
+pub struct TxRecordSmall<'a> {
+    #[serde(rename(deserialize = "type", serialize = "type"))]
+    pub type_id: &'a [u8],
+    #[serde(rename(deserialize = "client", serialize = "client"))]
+    pub client_id: u16,
+    #[serde(rename(deserialize = "tx", serialize = "tx"))]
+    pub tx_id: u32,
 }
 
 pub struct TxRecordReader {
     reader: Reader<File>,
-    headers: ByteRecord,
     tx_record_type: TxRecordType,
     tx_record_client: u16,
     tx_record_tx: u32,
@@ -116,18 +109,13 @@ pub struct TxRecordReader {
 
 impl TxRecordReader {
     pub fn new(csv_path: &str) -> Result<Self, AppError> {
-        let mut reader = Self::csv_reader(csv_path)?;
-        let headers = reader
-            .byte_headers()
-            .map_err(|e| AppError::new(PATH, FN_NEW, "02", &e.to_string()))?
-            .clone();
+        let reader = Self::csv_reader(csv_path)?;
         Ok(Self {
             reader,
-            headers,
             tx_record_type: TxRecordType::NONE,
             tx_record_client: 0,
             tx_record_tx: 0,
-            tx_record_amount: Decimal::new(0, 4),
+            tx_record_amount: Decimal::new(0, 0),
             byte_record: ByteRecord::new(),
             error: None,
         })
@@ -184,10 +172,21 @@ impl TxRecordReader {
             return false;
         }
 
-        let result = self
-            .byte_record
-            .deserialize::<TxRecord>(Some(&self.headers));
+        if tx_record_type.conflict_type() {
+            let result = self.byte_record.deserialize::<TxRecordSmall>(None);
+            if result.is_err() {
+                self.error = Some("invalid transaction record".to_string());
+                return false;
+            }
+            let tx_record = result.unwrap();
+            self.tx_record_type = tx_record_type;
+            self.tx_record_client = tx_record.client_id.clone();
+            self.tx_record_tx = tx_record.tx_id.clone();
+            self.tx_record_amount = Decimal::new(0, 0);
+            return true;
+        }
 
+        let result = self.byte_record.deserialize::<TxRecord>(None);
         if result.is_err() {
             let e = result.err().unwrap();
             self.error = Some(e.to_string());
@@ -206,7 +205,11 @@ impl TxRecordReader {
     fn csv_reader(csv_path: &str) -> Result<Reader<File>, AppError> {
         let f = fs::File::open(&csv_path)
             .map_err(|e| AppError::new(PATH, "csv_reader", "00", &e.to_string()))?;
-        Ok(csv::Reader::from_reader(f))
+        Ok(csv::ReaderBuilder::new()
+            .has_headers(true)
+            .flexible(true)
+            .trim(Trim::All)
+            .from_reader(f))
     }
 }
 
@@ -217,15 +220,19 @@ pub struct TxRecordWriter {
 impl TxRecordWriter {
     pub fn new(dir_path: &str, file_name: &str) -> Result<Self, AppError> {
         let file_path = Self::file_path(dir_path, file_name)?;
-        let writer = csv::Writer::from_path(&file_path)
-            .map_err(|e| AppError::new(PATH, FN_NEW, "02", &e.to_string()))?;
+        let writer = csv::WriterBuilder::new()
+            .flexible(true)
+            .from_path(&file_path)
+            .map_err(|e| AppError::new(PATH, FN_NEW, "00", &e.to_string()))?;
         Ok(Self { writer })
     }
 
     pub fn set_writer(&mut self, dir_path: &str, file_name: &str) -> Result<(), AppError> {
         let file_path = Self::file_path(dir_path, file_name)?;
-        self.writer = csv::Writer::from_path(&file_path)
-            .map_err(|e| AppError::new(PATH, FN_NEW, "02", &e.to_string()))?;
+        self.writer = csv::WriterBuilder::new()
+            .flexible(true)
+            .from_path(&file_path)
+            .map_err(|e| AppError::new(PATH, FN_NEW, "01", &e.to_string()))?;
         Ok(())
     }
 
