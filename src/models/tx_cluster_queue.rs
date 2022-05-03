@@ -1,4 +1,4 @@
-use crossbeam_channel::Receiver;
+use crossbeam_channel::{Receiver, Sender};
 use std::sync::{Arc, RwLock};
 
 use super::tx_cluster::TxClusterData;
@@ -10,10 +10,10 @@ const THREAD_SLEEP_DURATION: u64 = 500;
 
 pub struct TxClusterQueue<E> {
     started: bool,
-    rx: Option<Receiver<bool>>,
+    tx: Option<Sender<bool>>,
+    rx: Option<Receiver<Result<u16, AppError>>>,
     num_threads: u16,
     csv_cluster_dir: String,
-    arc_shutdown: Arc<RwLock<bool>>,
     arc_q: Arc<RwLock<Vec<E>>>,
 }
 
@@ -24,10 +24,10 @@ where
     pub fn new(csv_cluster_dir: &str, num_threads: u16) -> Self {
         Self {
             started: false,
+            tx: None,
             rx: None,
             num_threads,
             csv_cluster_dir: csv_cluster_dir.to_owned(),
-            arc_shutdown: Arc::new(RwLock::new(true)),
             arc_q: Arc::new(RwLock::new(Vec::new())),
         }
     }
@@ -59,16 +59,20 @@ where
         &self.arc_q
     }
 
-    fn mtx_shutdown(&self) -> &Arc<RwLock<bool>> {
-        &self.arc_shutdown
-    }
-
-    fn rx(&self) -> &Option<Receiver<bool>> {
+    fn rx(&self) -> &Option<Receiver<Result<u16, AppError>>> {
         &self.rx
     }
 
-    fn set_rx(&mut self, rx: Option<Receiver<bool>>) {
+    fn set_rx(&mut self, rx: Option<Receiver<Result<u16, AppError>>>) {
         self.rx = rx;
+    }
+
+    fn tx(&self) -> &Option<Sender<bool>> {
+        &self.tx
+    }
+
+    fn set_tx(&mut self, tx: Option<Sender<bool>>) {
+        self.tx = tx;
     }
 
     fn out_dir(&self) -> &str {

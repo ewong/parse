@@ -1,4 +1,4 @@
-use crossbeam_channel::{unbounded, Receiver};
+use crossbeam_channel::{bounded, unbounded, Receiver, Sender};
 use std::sync::{Arc, RwLock};
 use std::thread;
 use std::time::Duration;
@@ -15,16 +15,19 @@ pub trait TxQueue<T: Send + Sync + 'static> {
     fn started(&self) -> bool;
     fn set_started(&mut self, value: bool);
     fn mtx_q(&self) -> &Arc<RwLock<Vec<T>>>;
-    fn mtx_shutdown(&self) -> &Arc<RwLock<bool>>;
-    fn rx(&self) -> &Option<Receiver<bool>>;
-    fn set_rx(&mut self, rx: Option<Receiver<bool>>);
+
+    fn tx(&self) -> &Option<Sender<bool>>;
+    fn set_tx(&mut self, tx: Option<Sender<bool>>);
+
+    fn rx(&self) -> &Option<Receiver<Result<u16, AppError>>>;
+    fn set_rx(&mut self, rx: Option<Receiver<Result<u16, AppError>>>);
+
     fn out_dir(&self) -> &str;
     fn process_entry(out_dir: &str, entry: &T) -> Result<(), AppError>;
 
     fn start(&mut self) -> Result<(), AppError> {
         if !self.started() {
             self.set_started(true);
-            self.set_shutdown(false)?;
             self.spawn_workers()?;
         }
         Ok(())
@@ -33,13 +36,25 @@ pub trait TxQueue<T: Send + Sync + 'static> {
     fn stop(&mut self) -> Result<(), AppError> {
         if self.started() {
             self.set_started(false);
-            self.set_shutdown(true)?;
 
-            // block until all threads are done
-            if let Some(rx) = self.rx() {
-                for _ in 0..self.num_threads() {
-                    rx.recv().unwrap();
+            let mut err: Option<AppError> = None;
+            if let Some(tx) = self.tx() {
+                tx.send(true).unwrap();
+                // block until all threads are done
+                if let Some(rx) = self.rx() {
+                    for _ in 0..self.num_threads() {
+                        if let Ok(wid) = rx.recv() {
+                            if wid.is_err() {
+                                err = wid.err();
+                            } else {
+                                println!("worker {} is shutdown", wid.unwrap());
+                            }
+                        }
+                    }
                 }
+            }
+            if err.is_some() {
+                return Err(err.unwrap());
             }
         }
         Ok(())
@@ -60,40 +75,18 @@ pub trait TxQueue<T: Send + Sync + 'static> {
         return Err(AppError::new(PATH, "get_queue", "00", msg));
     }
 
-    fn set_shutdown(&self, value: bool) -> Result<(), AppError> {
-        for _ in 1..MTX_NUM_TRIES {
-            if let Ok(mut mtx_shutdown) = self.mtx_shutdown().write() {
-                *mtx_shutdown = value;
-                return Ok(());
-            } else {
-                thread::sleep(Duration::from_millis(MTX_SLEEP_DURATION));
-            }
-        }
-        let msg = "error accessing shutdown lock";
-        return Err(AppError::new(PATH, "get_shutdown", "00", msg));
-    }
-
-    fn is_shutdown(&self) -> Result<bool, AppError> {
-        for _ in 1..MTX_NUM_TRIES {
-            if let Ok(mtx_shutdown) = self.mtx_shutdown().read() {
-                return Ok(*mtx_shutdown);
-            } else {
-                thread::sleep(Duration::from_millis(MTX_SLEEP_DURATION));
-            }
-        }
-        let msg = "error accessing shutdown lock";
-        return Err(AppError::new(PATH, "get_shutdown", "00", msg));
-    }
-
     fn spawn_workers(&mut self) -> Result<(), AppError> {
-        let (s, r) = unbounded();
-        self.set_rx(Some(r));
+        let (child_tx, parent_rx) = unbounded();
+        let (parent_tx, child_rx) = bounded(1);
+
+        self.set_tx(Some(parent_tx));
+        self.set_rx(Some(parent_rx));
 
         for wid in 0..self.num_threads() {
             let mtx_q = Arc::clone(&self.mtx_q());
-            let mtx_shutdown = Arc::clone(&self.mtx_shutdown());
             let out_dir_path = self.out_dir().to_owned();
-            let tx = s.clone();
+            let tx = child_tx.clone();
+            let rx = child_rx.clone();
 
             thread::spawn(move || loop {
                 let res = mtx_q.write();
@@ -108,12 +101,9 @@ pub trait TxQueue<T: Send + Sync + 'static> {
                 if q.len() == 0 {
                     drop(q);
                     drop(mgq);
-                    if let Ok(shutdown) = mtx_shutdown.read() {
-                        if *shutdown {
-                            println!("worker {} is shutdown", wid);
-                            tx.send(true).unwrap();
-                            break;
-                        }
+                    if rx.len() > 0 {
+                        tx.send(Ok(wid)).unwrap();
+                        break;
                     }
                     continue;
                 }
@@ -123,10 +113,8 @@ pub trait TxQueue<T: Send + Sync + 'static> {
                     drop(mgq);
                     let result = Self::process_entry(&out_dir_path, &entry);
                     if result.is_err() {
-                        // change this so that each worker passes back Result<(), AppError>
                         println!("worker {} failed. rolling back", wid);
-                        result.err().unwrap().show();
-                        tx.send(true).unwrap();
+                        tx.send(Err(result.err().unwrap())).unwrap();
                         break;
                     }
                 }

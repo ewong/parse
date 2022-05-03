@@ -1,4 +1,4 @@
-use crossbeam_channel::Receiver;
+use crossbeam_channel::{Receiver, Sender};
 use std::fs;
 use std::sync::{Arc, RwLock};
 
@@ -17,10 +17,10 @@ const THREAD_SLEEP_DURATION: u64 = 100;
 
 pub struct TxSummaryQueue<T> {
     started: bool,
-    rx: Option<Receiver<bool>>,
+    tx: Option<Sender<bool>>,
+    rx: Option<Receiver<Result<u16, AppError>>>,
     num_threads: u16,
     summary_dir: String,
-    arc_shutdown: Arc<RwLock<bool>>,
     arc_q: Arc<RwLock<Vec<T>>>,
 }
 
@@ -31,15 +31,14 @@ where
     pub fn new(summary_dir: &str, dir_paths: Vec<T>, num_threads: u16) -> Self {
         Self {
             started: false,
+            tx: None,
             rx: None,
             num_threads,
             summary_dir: summary_dir.to_owned(),
-            arc_shutdown: Arc::new(RwLock::new(true)),
             arc_q: Arc::new(RwLock::new(dir_paths)),
         }
     }
 
-    // todo: implement with priority queue/heap
     fn file_path_and_names_in_client_tx_dir(entry: &T) -> Result<Vec<String>, AppError> {
         let paths = fs::read_dir(entry.dir_path())
             .map_err(|e| AppError::new(PATH, FN_PROCESS_ENTRY, "00", &e.to_string()))?;
@@ -118,16 +117,20 @@ where
         &self.arc_q
     }
 
-    fn mtx_shutdown(&self) -> &Arc<RwLock<bool>> {
-        &self.arc_shutdown
-    }
-
-    fn rx(&self) -> &Option<Receiver<bool>> {
+    fn rx(&self) -> &Option<Receiver<Result<u16, AppError>>> {
         &self.rx
     }
 
-    fn set_rx(&mut self, rx: Option<Receiver<bool>>) {
+    fn set_rx(&mut self, rx: Option<Receiver<Result<u16, AppError>>>) {
         self.rx = rx;
+    }
+
+    fn tx(&self) -> &Option<Sender<bool>> {
+        &self.tx
+    }
+
+    fn set_tx(&mut self, tx: Option<Sender<bool>>) {
+        self.tx = tx;
     }
 
     fn out_dir(&self) -> &str {
