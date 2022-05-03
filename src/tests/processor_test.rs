@@ -73,7 +73,13 @@ fn process_deposit_test() {
 
     // check balance
     let account_base = [SUMMARY_DIR, "deposit"].join("/");
-    let _account = Account::new(1, &account_base);
+
+    let mut account = Account::new(1, &account_base);
+    assert_eq!(account.client_id, 1);
+    assert_eq!(account.available, Decimal::new(3, 0));
+    assert_eq!(account.held, Decimal::new(0, 0));
+    assert_eq!(account.total, Decimal::new(3, 0));
+    assert!(!account.locked);
 
     // -------- //
     // client 2 //
@@ -95,6 +101,13 @@ fn process_deposit_test() {
     assert_eq!(reader.tx_record_tx(), &6);
     assert_eq!(reader.tx_record_amount(), &Decimal::new(2, 0));
 
+    account = Account::new(2, &account_base);
+    assert_eq!(account.client_id, 2);
+    assert_eq!(account.available, Decimal::new(3, 0));
+    assert_eq!(account.held, Decimal::new(0, 0));
+    assert_eq!(account.total, Decimal::new(3, 0));
+    assert!(!account.locked);
+
     // -------- //
     // client 3 //
     // -------- //
@@ -114,6 +127,13 @@ fn process_deposit_test() {
     assert_eq!(reader.tx_record_client(), &3);
     assert_eq!(reader.tx_record_tx(), &7);
     assert_eq!(reader.tx_record_amount(), &Decimal::new(2, 0));
+
+    account = Account::new(3, &account_base);
+    assert_eq!(account.client_id, 3);
+    assert_eq!(account.available, Decimal::new(3, 0));
+    assert_eq!(account.held, Decimal::new(0, 0));
+    assert_eq!(account.total, Decimal::new(3, 0));
+    assert!(!account.locked);
 
     // -------- //
     // client 4 //
@@ -135,8 +155,12 @@ fn process_deposit_test() {
     assert_eq!(reader.tx_record_tx(), &5);
     assert_eq!(reader.tx_record_amount(), &Decimal::new(2, 0));
 
-    // test account balances
-    // available should be 3 for all clients
+    account = Account::new(4, &account_base);
+    assert_eq!(account.client_id, 4);
+    assert_eq!(account.available, Decimal::new(3, 0));
+    assert_eq!(account.held, Decimal::new(0, 0));
+    assert_eq!(account.total, Decimal::new(3, 0));
+    assert!(!account.locked);
 
     TestHelper::remove_dir(&base);
 }
@@ -224,8 +248,15 @@ fn process_withdraw_test() {
     assert_eq!(reader.tx_record_tx(), &1);
     assert_eq!(reader.tx_record_amount(), &Decimal::new(5, 0));
 
-    // test account balances
-    // available should be 9
+    // check balance
+    let account_base = [SUMMARY_DIR, "withdraw"].join("/");
+
+    let account = Account::new(1, &account_base);
+    assert_eq!(account.client_id, 1);
+    assert_eq!(account.available, Decimal::new(9, 0));
+    assert_eq!(account.held, Decimal::new(0, 0));
+    assert_eq!(account.total, Decimal::new(9, 0));
+    assert!(!account.locked);
 
     TestHelper::remove_dir(&base);
 }

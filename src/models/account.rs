@@ -21,47 +21,51 @@ struct TxConflict {
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct Account {
     #[serde(rename(deserialize = "client", serialize = "client"))]
-    client_id: u16,
-    available: Decimal,
-    held: Decimal,
-    total: Decimal,
-    locked: bool,
+    pub client_id: u16,
+    pub available: Decimal,
+    pub held: Decimal,
+    pub total: Decimal,
+    pub locked: bool,
 
     #[serde(skip)]
     tx_conflict_map: Option<HashMap<u32, TxConflict>>,
 }
 
 impl Account {
-    pub fn new(client_id: u16, account_dir: &str) -> Result<Self, AppError> {
+    pub fn new(client_id: u16, account_dir: &str) -> Self {
         let result = fs::File::open(&[account_dir, "/", &client_id.to_string(), ".csv"].join(""));
         if result.is_err() {
-            return Ok(Self::default_instance(client_id));
+            return Self::default_instance(client_id);
         }
 
         let f = result.unwrap();
         let mut reader = csv::Reader::from_reader(f);
-        let headers = reader
+        let result = reader
             .byte_headers()
-            .map_err(|e| AppError::new(PATH, FN_NEW, "01", &e.to_string()))?
-            .clone();
+            .map_err(|e| AppError::new(PATH, FN_NEW, "01", &e.to_string()));
 
+        if result.is_err() {
+            return Self::default_instance(client_id);
+        }
+
+        let headers = result.unwrap().clone();
         let mut byte_record = ByteRecord::new();
         let result = reader.read_byte_record(&mut byte_record);
         if result.is_err() {
-            return Ok(Self::default_instance(client_id));
+            return Self::default_instance(client_id);
         }
 
         if byte_record.len() == 0 {
-            return Ok(Self::default_instance(client_id));
+            return Self::default_instance(client_id);
         }
 
         let result = byte_record.deserialize::<Account>(Some(&headers));
 
         if result.is_err() {
-            return Ok(Self::default_instance(client_id));
+            return Self::default_instance(client_id);
         }
 
-        Ok(result.unwrap())
+        result.unwrap()
     }
 
     fn default_instance(client_id: u16) -> Self {
