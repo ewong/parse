@@ -11,7 +11,6 @@ use crate::lib::error::AppError;
 const PATH: &str = "models/tx_record";
 
 const TYPE_POS: usize = 0;
-// const CLIENT_POS: usize = 1;
 
 const TYPE_COL: &str = "type";
 const CLIENT_COL: &str = "client";

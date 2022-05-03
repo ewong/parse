@@ -132,7 +132,7 @@ where
         &self.out_dir
     }
 
-    fn process_entry(_out_dir: &str, entry: &T) -> Result<(), AppError> {
+    fn process_entry(out_dir: &str, entry: &T) -> Result<(), AppError> {
         let file_paths = Self::file_path_and_names_in_client_tx_dir(entry)?;
 
         if file_paths.len() == 0 {
@@ -161,8 +161,7 @@ where
             }
         }
 
-        account.show();
-
+        account.write_to_csv(out_dir)?;
         Ok(())
     }
 }

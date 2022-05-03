@@ -4,6 +4,27 @@ use super::helpers::helper::TestHelper;
 use crate::models::processor::Processor;
 use crate::models::tx_record::{TxRecordReader, TxRecordType};
 
+/*
+    dispute
+    - tx doesn't exist
+    - tx exists
+    - dispute on a disputed account
+    - dispute on a resolved account that 
+
+    resolve
+    - tx doesn't exist
+    - resolve on a clean account => ignore
+    - resolve on a disputed account => process
+    - resolve on a tx that has been resolved => ignore
+
+    chargeback
+    - tx doesn't exist
+    - deposit on a locked account
+    - withdraw on a locked account
+    - dispute on a frozen account
+    - chargeback on a frozen account
+*/
+
 #[test]
 fn process_deposit_test() {
     // --------- //
@@ -111,7 +132,7 @@ fn process_deposit_test() {
     // test account balances
     // available should be 3 for all clients
 
-    TestHelper::cleanup("data/deposit");
+    TestHelper::remove_dir("data/deposit");
 }
 
 #[test]
@@ -200,7 +221,7 @@ fn process_withdraw_test() {
     // test account balances
     // available should be 9
 
-    TestHelper::cleanup("data/withdraw");
+    TestHelper::remove_dir("data/withdraw");
 }
 
 // fn process_dispute_test() {

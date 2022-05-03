@@ -6,6 +6,9 @@ use std::{collections::HashMap, fs};
 use super::tx_record::TxRecordType;
 use crate::lib::error::AppError;
 
+const PATH: &str = "model/account";
+const FN_WRITE_CSV: &str = "write_csv";
+
 #[derive(Debug, Clone)]
 struct TxConflict {
     state: TxRecordType,
@@ -38,13 +41,6 @@ impl Account {
             locked: false,
             tx_conflict_map,
         })
-    }
-
-    pub fn show(&self) {
-        println!(
-            "completed --> client {}, available: {}, held: {}, total: {}, locked: {}",
-            self.client_id, self.available, self.held, self.total, self.locked
-        );
     }
 
     pub fn handle_tx(&mut self, tx_type: &TxRecordType, tx_id: &u32, amount: &Decimal) {
@@ -142,6 +138,25 @@ impl Account {
             }
             _ => {}
         }
+    }
+
+    pub fn write_to_csv(&mut self, account_dir: &str) -> Result<(), AppError> {
+        fs::create_dir_all(account_dir)
+            .map_err(|e| AppError::new(PATH, FN_WRITE_CSV, "00", &e.to_string()))?;
+        let file_path = [account_dir, "/", &self.client_id.to_string(), ".csv"].join("");
+
+        let mut writer = csv::Writer::from_path(&file_path)
+            .map_err(|e| AppError::new(PATH, FN_WRITE_CSV, "01", &e.to_string()))?;
+
+        writer
+            .serialize(self)
+            .map_err(|e| AppError::new(PATH, FN_WRITE_CSV, "03", &e.to_string()))?;
+
+        writer
+            .flush()
+            .map_err(|e| AppError::new(PATH, FN_WRITE_CSV, "04", &e.to_string()))?;
+
+        Ok(())
     }
 
     fn load_tx_id_conflict_map(tx_dir: &str) -> Option<HashMap<u32, TxConflict>> {

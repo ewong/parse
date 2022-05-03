@@ -10,39 +10,41 @@ use crate::lib::timer::Timer;
 use crate::lib::tx_queue::TxQueue;
 
 const PATH: &str = "model/processor";
-const OUTPUT_ROOT_DIR: &str = "data";
+const OUT_DIR: &str = "data";
 const ACCOUNT_DIR: &str = "data/accounts";
 
 const BLOCK_SIZE: usize = 1_000_000;
 
 pub struct Processor<'a> {
-    file_path: &'a str,
+    source_csv_path: &'a str,
 }
 
 impl<'a> Processor<'a> {
-    pub fn new(file_path: &'a str) -> Self {
-        Self { file_path }
+    pub fn new(source_csv_path: &'a str) -> Self {
+        Self { source_csv_path }
     }
 
     pub fn process_csv(&self, cleanup: bool) -> Result<(), AppError> {
         let timer = Timer::start();
-        let working_dir = self.file_dir()?;
+        let working_dir = self.file_dir(OUT_DIR)?;
         self.cluster_transactions_by_client(&working_dir)?;
         self.summarize_transactions_by_client(&working_dir)?;
         if cleanup {
+            let account_dir = self.file_dir(ACCOUNT_DIR)?;
             let _ = fs::remove_dir_all(working_dir);
+            let _ = fs::remove_dir_all(account_dir);
         }
         timer.stop();
         Ok(())
     }
 
-    fn file_dir(&self) -> Result<String, AppError> {
-        let v: Vec<&str> = self.file_path.split("/").collect();
+    fn file_dir(&self, base: &str) -> Result<String, AppError> {
+        let v: Vec<&str> = self.source_csv_path.split("/").collect();
         if v.len() > 0 {
             let file_name = v[v.len() - 1];
             if file_name.len() > 0 {
                 let v: Vec<&str> = file_name.split(".").collect();
-                return Ok([OUTPUT_ROOT_DIR, v[0]].join("/"));
+                return Ok([base, v[0]].join("/"));
             }
         }
         Err(AppError::new(PATH, "file_dir", "01", "invalid file path"))
@@ -52,7 +54,7 @@ impl<'a> Processor<'a> {
         // let timer = Timer::start();
 
         let mut tx_cluster = TxCluster::new(0);
-        let mut tx_reader = TxRecordReader::new(self.file_path)?;
+        let mut tx_reader = TxRecordReader::new(self.source_csv_path)?;
         let mut q = TxClusterQueue::new(working_dir);
         // let mut block_timer = Timer::start();
 
@@ -122,7 +124,8 @@ impl<'a> Processor<'a> {
 
     fn summarize_transactions_by_client(&self, working_dir: &str) -> Result<(), AppError> {
         let summaries = TxSummary::summaries(working_dir)?;
-        let mut q = TxSummaryQueue::new(ACCOUNT_DIR, summaries);
+        let account_dir = self.file_dir(ACCOUNT_DIR)?;
+        let mut q = TxSummaryQueue::new(&account_dir, summaries);
         q.start()?;
         q.stop()?;
         Ok(())
