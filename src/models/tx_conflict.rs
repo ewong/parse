@@ -13,78 +13,90 @@ pub struct TxConflictState {
 
 #[derive(Debug, Clone)]
 pub struct TxConflict {
+    pub txt_map: HashMap<u32, TxConflictState>,
     pub map: HashMap<u32, TxConflictState>,
 }
 
 impl TxConflict {
-    pub fn new(tx_dir: &str) -> Option<Self> {
-        return None;
-        // let conflict_dir = [tx_dir, "conflicts"].join("/");
-        // let paths = fs::read_dir(&conflict_dir);
+    pub fn new(tx_dir: &str) -> Self {
+        Self {
+            txt_map: Self::load_txt_map(tx_dir),
+            map: HashMap::new(),
+        }
+    }
 
-        // if paths.is_err() {
-        //     return None;
-        // }
+    fn load_txt_map(tx_dir: &str) -> HashMap<u32, TxConflictState> {
+        let mut map: HashMap<u32, TxConflictState> = HashMap::new();
+        let paths = Self::conflict_paths(tx_dir, "txt");
+        if paths.is_none() {
+            return map;
+        }
 
-        // let conflict_paths: Vec<String> = paths
-        //     .unwrap()
-        //     .map(|e| {
-        //         if e.is_err() {
-        //             return "".to_string();
-        //         }
+        for path in paths.unwrap() {
+            let result = fs::File::open(&path);
+            if result.is_err() {
+                continue;
+            }
 
-        //         let path = e.unwrap();
-        //         if path.path().file_name().is_none() {
-        //             return "".to_string();
-        //         }
+            let mut f = result.unwrap();
+            let mut s = String::new();
+            let result = f.read_to_string(&mut s);
 
-        //         if !path.path().is_file() {
-        //             return "".to_string();
-        //         }
+            if result.is_ok() {
+                let list = s.replace("[", "").replace("]", "").replace(" ", "");
+                for x in list.split(",") {
+                    let tx_id = x.to_string().parse::<u32>().unwrap();
+                    if !map.contains_key(&tx_id) {
+                        map.insert(
+                            tx_id,
+                            TxConflictState {
+                                state: TxRecordType::NONE,
+                                tx_type: TxRecordType::NONE,
+                                amount: Decimal::new(0, 0),
+                            },
+                        );
+                    }
+                }
+            }
+        }
 
-        //         path.path().display().to_string()
-        //     })
-        //     .filter(|s| s.len() > 0)
-        //     .collect();
+        map
+    }
 
-        // if conflict_paths.len() == 0 {
-        //     return None;
-        // }
+    fn conflict_paths(tx_dir: &str, ext: &str) -> Option<Vec<String>> {
+        let conflict_txt_dir = [tx_dir, "txt"].join("/");
+        let paths = fs::read_dir(&conflict_txt_dir);
 
-        // let mut map: HashMap<u32, TxConflictState> = HashMap::new();
-        // for path in conflict_paths {
-        //     let result = fs::File::open(&path);
-        //     if result.is_err() {
-        //         continue;
-        //     }
+        if paths.is_err() {
+            return None;
+        }
 
-        //     let mut f = result.unwrap();
-        //     let mut s = String::new();
-        //     let result = f.read_to_string(&mut s);
+        let conflict_paths: Vec<String> = paths
+            .unwrap()
+            .map(|e| {
+                if e.is_err() {
+                    return "".to_string();
+                }
 
-        //     if result.is_ok() {
-        //         let list = s.replace("{", "").replace("}", "").replace(" ", "");
-        //         for x in list.split(",") {
-        //             let tx_id = x.to_string().parse::<u32>().unwrap();
-        //             if !map.contains_key(&tx_id) {
-        //                 map.insert(
-        //                     tx_id,
-        //                     TxConflictState {
-        //                         state: TxRecordType::NONE,
-        //                         tx_type: TxRecordType::NONE,
-        //                         amount: Decimal::new(0, 0),
-        //                     },
-        //                 );
-        //             }
-        //         }
-        //     }
-        // }
+                let path = e.unwrap();
+                if path.path().file_name().is_none() {
+                    return "".to_string();
+                }
 
-        // if map.len() == 0 {
-        //     return None;
-        // }
+                if !path.path().is_file() {
+                    return "".to_string();
+                }
 
-        // Some(Self { map })
+                path.path().display().to_string()
+            })
+            .filter(|s| s.len() > 0)
+            .collect();
+
+        if conflict_paths.len() == 0 {
+            return None;
+        }
+
+        Some(conflict_paths)
     }
 
     pub fn update_conflicts(&mut self, tx_id: &u32, tx_type: &TxRecordType, amount: &Decimal) {

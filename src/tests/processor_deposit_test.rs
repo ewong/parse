@@ -56,7 +56,7 @@ fn process_deposit_test() {
     // check balance
     let summary_base = [SUMMARY_DIR, "deposit"].join("/");
 
-    let mut account = Account::new(1, &summary_base, &cluster_base);
+    let mut account = Account::new(1, &summary_base);
     assert_eq!(account.client_id, 1);
     assert_eq!(account.available, Decimal::new(3, 0));
     assert_eq!(account.held, Decimal::new(0, 0));
@@ -85,7 +85,7 @@ fn process_deposit_test() {
     assert_eq!(reader.tx_record_tx(), &6);
     assert_eq!(reader.tx_record_amount(), &Decimal::new(2, 0));
 
-    account = Account::new(2, &summary_base, &cluster_base);
+    account = Account::new(2, &summary_base);
     assert_eq!(account.client_id, 2);
     assert_eq!(account.available, Decimal::new(3, 0));
     assert_eq!(account.held, Decimal::new(0, 0));
@@ -114,7 +114,7 @@ fn process_deposit_test() {
     assert_eq!(reader.tx_record_tx(), &7);
     assert_eq!(reader.tx_record_amount(), &Decimal::new(2, 0));
 
-    account = Account::new(3, &summary_base, &cluster_base);
+    account = Account::new(3, &summary_base);
     assert_eq!(account.client_id, 3);
     assert_eq!(account.available, Decimal::new(3, 0));
     assert_eq!(account.held, Decimal::new(0, 0));
@@ -143,7 +143,7 @@ fn process_deposit_test() {
     assert_eq!(reader.tx_record_tx(), &5);
     assert_eq!(reader.tx_record_amount(), &Decimal::new(2, 0));
 
-    account = Account::new(4, &summary_base, &cluster_base);
+    account = Account::new(4, &summary_base);
     assert_eq!(account.client_id, 4);
     assert_eq!(account.available, Decimal::new(3, 0));
     assert_eq!(account.held, Decimal::new(0, 0));

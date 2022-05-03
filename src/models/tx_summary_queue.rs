@@ -9,6 +9,7 @@ use crate::models::tx_record::TxRecordReader;
 
 use super::account::Account;
 use super::tx_cluster::TxClusterPathData;
+use super::tx_conflict::TxConflict;
 
 const PATH: &str = "model/client_queue";
 const FN_PROCESS_ENTRY: &str = "process_entry";
@@ -144,7 +145,8 @@ where
             return Ok(());
         }
 
-        let mut account = Account::new(entry.client_id(), ACCOUNT_DIR, entry.dir_path());
+        let mut tx_conflict = TxConflict::new(entry.dir_path());
+        let mut account = Account::new(entry.client_id(), ACCOUNT_DIR);
         let mut tx_reader = TxRecordReader::new(&file_paths.get(0).unwrap())?;
         let mut initial_loop = true;
 
@@ -162,6 +164,7 @@ where
                     tx_reader.tx_record_type(),
                     tx_reader.tx_record_tx(),
                     tx_reader.tx_record_amount(),
+                    &mut tx_conflict,
                 );
             }
         }
