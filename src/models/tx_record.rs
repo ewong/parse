@@ -53,7 +53,7 @@ impl TxRecordType {
 
         // try to convert it to a lower case str + retest
         if let Ok(str) = str::from_utf8(binary) {
-            return match str.to_lowercase().as_str() {
+            return match str.to_lowercase().replace(" ", "").as_str() {
                 "deposit" => Self::DEPOSIT,
                 "withdraw" => Self::WITHDRAW,
                 "dispute" => Self::DISPUTE,
