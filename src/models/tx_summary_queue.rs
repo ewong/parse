@@ -8,7 +8,7 @@ use crate::lib::tx_queue::TxQueue;
 use crate::models::tx_record::TxRecordReader;
 
 use super::account::Account;
-use super::tx_summary::TxSummaryData;
+use super::tx_cluster::TxClusterPathData;
 
 const PATH: &str = "model/client_queue";
 const FN_PROCESS_ENTRY: &str = "process_entry";
@@ -26,7 +26,7 @@ pub struct TxSummaryQueue<T> {
 
 impl<T> TxSummaryQueue<T>
 where
-    T: TxSummaryData,
+    T: TxClusterPathData,
 {
     pub fn new(out_dir: &str, dir_paths: Vec<T>) -> Self {
         Self {
@@ -95,7 +95,7 @@ where
 
 impl<T> TxQueue<T> for TxSummaryQueue<T>
 where
-    T: TxSummaryData,
+    T: TxClusterPathData,
 {
     fn num_threads() -> u16 {
         NUM_THREADS

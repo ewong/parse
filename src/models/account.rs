@@ -33,9 +33,24 @@ pub struct Account {
 
 impl Account {
     pub fn new(client_id: u16, account_dir: &str) -> Self {
+        let user_opt = Self::load_user_from_file(client_id, account_dir);
+        if user_opt.is_none() {
+            return Self {
+                client_id,
+                available: Decimal::new(0, 0),
+                held: Decimal::new(0, 0),
+                total: Decimal::new(0, 0),
+                locked: false,
+                tx_conflict_map: None,
+            };
+        }
+        user_opt.unwrap()
+    }
+
+    fn load_user_from_file(client_id: u16, account_dir: &str) -> Option<Account> {
         let result = fs::File::open(&[account_dir, "/", &client_id.to_string(), ".csv"].join(""));
         if result.is_err() {
-            return Self::default_instance(client_id);
+            return None;
         }
 
         let f = result.unwrap();
@@ -45,38 +60,27 @@ impl Account {
             .map_err(|e| AppError::new(PATH, FN_NEW, "01", &e.to_string()));
 
         if result.is_err() {
-            return Self::default_instance(client_id);
+            return None;
         }
 
         let headers = result.unwrap().clone();
         let mut byte_record = ByteRecord::new();
         let result = reader.read_byte_record(&mut byte_record);
         if result.is_err() {
-            return Self::default_instance(client_id);
+            return None;
         }
 
         if byte_record.len() == 0 {
-            return Self::default_instance(client_id);
+            return None;
         }
 
         let result = byte_record.deserialize::<Account>(Some(&headers));
 
         if result.is_err() {
-            return Self::default_instance(client_id);
+            return None;
         }
 
-        result.unwrap()
-    }
-
-    fn default_instance(client_id: u16) -> Self {
-        Self {
-            client_id,
-            available: Decimal::new(0, 0),
-            held: Decimal::new(0, 0),
-            total: Decimal::new(0, 0),
-            locked: false,
-            tx_conflict_map: None,
-        }
+        Some(result.unwrap())
     }
 
     pub fn load_tx_conflict_map(&mut self, tx_dir: &str) {
@@ -187,8 +191,14 @@ impl Account {
                         map.entry(tx_id.clone()).and_modify(|e| {
                             if e.state == TxRecordType::NONE {
                                 e.state = TxRecordType::DISPUTE;
-                                self.held += e.amount;
-                                self.available -= e.amount;
+                                if e.tx_type == TxRecordType::DEPOSIT {
+                                    self.held += e.amount;
+                                    self.available -= e.amount;
+                                }
+                                // if the dispute is on a withdrawal we do nothing.
+                                // withdrawal chargebacks are handled like debit card/atm chargebacks.
+                                // debit card/atm chargebacks only revert transaction on the chargeback.
+
                                 // println!(
                                 //     "dispute --> tx_id: {}, client {}, available: {}, held: {}, total: {}, locked: {}",
                                 //     tx_id, self.client_id, self.available, self.held, self.total, self.locked
@@ -208,8 +218,13 @@ impl Account {
                         map.entry(tx_id.clone()).and_modify(|e| {
                             if e.state == TxRecordType::DISPUTE {
                                 e.state = TxRecordType::RESOLVE;
-                                self.held -= e.amount;
-                                self.available += e.amount;
+                                if e.tx_type == TxRecordType::DEPOSIT {
+                                    self.held -= e.amount;
+                                    self.available += e.amount;
+                                }
+                                // if the resolve is on a withdrawal we do nothing.
+                                // withdrawal chargebacks are handled like debit card/atm chargebacks.
+                                // debit card/atm chargebacks only revert transaction on the chargeback.
                                 // println!(
                                 //     "resolve --> tx_id: {}, client {}, available: {}, held: {}, total: {}, locked: {}",
                                 //     tx_id, self.client_id, self.available, self.held, self.total, self.locked
@@ -229,8 +244,14 @@ impl Account {
                         map.entry(tx_id.clone()).and_modify(|e| {
                             if e.state == TxRecordType::DISPUTE {
                                 e.state = TxRecordType::CHARGEBACK;
-                                self.held -= e.amount;
-                                self.total -= e.amount;
+                                if e.tx_type == TxRecordType::DEPOSIT {
+                                    self.held -= e.amount;
+                                    self.total -= e.amount;
+                                } else if e.tx_type == TxRecordType::WITHDRAW {
+                                    // if the chargeback is on a withdrawal reimburse the client the amount of the withdrawal.
+                                    self.available += e.amount;
+                                    self.total += e.amount;
+                                }
                                 self.locked = true;
                                 // println!(
                                 //     "chargeback --> tx_id: {}, client {}, available: {}, held: {}, total: {}, locked: {}",
@@ -246,8 +267,6 @@ impl Account {
     }
 
     pub fn write_to_csv(&mut self, account_dir: &str) -> Result<(), AppError> {
-        fs::create_dir_all(account_dir)
-            .map_err(|e| AppError::new(PATH, FN_WRITE_CSV, "00", &e.to_string()))?;
         let file_path = [account_dir, "/", &self.client_id.to_string(), ".csv"].join("");
 
         let mut writer = csv::Writer::from_path(&file_path)

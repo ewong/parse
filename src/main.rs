@@ -15,7 +15,13 @@ struct Args {
 
 fn main() {
     let args = Args::parse();
-    let p = Processor::new(&args.file);
+    let result = Processor::new(&args.file);
+    if result.is_err() {
+        result.err().unwrap().show();
+        return;
+    }
+
+    let p = result.unwrap();
     if let Err(err) = p.process_csv(true) {
         err.show();
     }

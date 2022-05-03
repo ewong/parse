@@ -22,7 +22,10 @@ fn process_withdraw_test() {
     // withdraw,1,7,1
     // deposit,1,1,5
 
-    let p = Processor::new("src/tests/csv/withdraw.csv");
+    let result = Processor::new("src/tests/csv/withdraw.csv");
+    assert!(result.is_ok());
+    
+    let p = result.unwrap();
     let result = p.process_csv(false);
     assert!(result.is_ok());
 

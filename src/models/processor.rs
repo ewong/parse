@@ -1,11 +1,10 @@
 use std::fs;
 
-use super::tx_cluster::{TxCluster, TxClusterData};
+use super::tx_cluster::{TxCluster, TxClusterData, TxClusterPath};
 use super::tx_cluster_queue::TxClusterQueue;
 use super::tx_record::TxRecordReader;
-use super::tx_summary::TxSummary;
 use super::tx_summary_queue::TxSummaryQueue;
-use crate::lib::constants::{CLUSTER_DIR, SUMMARY_DIR};
+use crate::lib::constants::{ACCOUNT_DIR, CLUSTER_DIR, FN_NEW, SUMMARY_DIR, TRANSACTION_DIR};
 use crate::lib::error::AppError;
 use crate::lib::timer::Timer;
 use crate::lib::tx_queue::TxQueue;
@@ -15,43 +14,53 @@ const BLOCK_SIZE: usize = 1_000_000;
 
 pub struct Processor<'a> {
     source_csv_path: &'a str,
+    csv_cluster_dir: String,
+    csv_summary_dir: String,
 }
 
 impl<'a> Processor<'a> {
-    pub fn new(source_csv_path: &'a str) -> Self {
-        Self { source_csv_path }
+    pub fn new(source_csv_path: &'a str) -> Result<Self, AppError> {
+        let csv_cluster_dir = Self::csv_base_dir(source_csv_path, CLUSTER_DIR)?;
+        let csv_summary_dir = Self::csv_base_dir(source_csv_path, SUMMARY_DIR)?;
+
+        fs::create_dir_all(csv_cluster_dir.clone())
+            .map_err(|e| AppError::new(PATH, FN_NEW, "0", &e.to_string()))?;
+
+        fs::create_dir_all(csv_summary_dir.clone())
+            .map_err(|e| AppError::new(PATH, FN_NEW, "1", &e.to_string()))?;
+
+        fs::create_dir_all(ACCOUNT_DIR.clone())
+            .map_err(|e| AppError::new(PATH, FN_NEW, "2", &e.to_string()))?;
+
+        fs::create_dir_all(TRANSACTION_DIR.clone())
+            .map_err(|e| AppError::new(PATH, FN_NEW, "3", &e.to_string()))?;
+
+        Ok(Self {
+            source_csv_path,
+            csv_cluster_dir,
+            csv_summary_dir,
+        })
     }
 
-    pub fn process_csv(&self, cleanup: bool) -> Result<(), AppError> {
+    pub fn process_csv(&self, enable_cleanup: bool) -> Result<(), AppError> {
         let timer = Timer::start();
-        let working_dir = self.file_dir(CLUSTER_DIR)?;
-        self.cluster_transactions_by_client(&working_dir)?;
-        self.summarize_transactions_by_client(&working_dir)?;
-        if cleanup {
-            let account_dir = self.file_dir(SUMMARY_DIR)?;
-            let _ = fs::remove_dir_all(working_dir);
-            let _ = fs::remove_dir_all(account_dir);
+
+        let result = self.cluster_transactions_by_client();
+        if result.is_err() {
+            self.cleanup(enable_cleanup);
+            return result;
         }
+
+        let result = self.summarize_transactions_by_client();
+        self.cleanup(enable_cleanup);
         timer.stop();
-        Ok(())
+        result
     }
 
-    fn file_dir(&self, base: &str) -> Result<String, AppError> {
-        let v: Vec<&str> = self.source_csv_path.split("/").collect();
-        if v.len() > 0 {
-            let file_name = v[v.len() - 1];
-            if file_name.len() > 0 {
-                let v: Vec<&str> = file_name.split(".").collect();
-                return Ok([base, v[0]].join("/"));
-            }
-        }
-        Err(AppError::new(PATH, "file_dir", "01", "invalid file path"))
-    }
-
-    fn cluster_transactions_by_client(&self, working_dir: &str) -> Result<(), AppError> {
+    fn cluster_transactions_by_client(&self) -> Result<(), AppError> {
         let mut tx_cluster = TxCluster::new(0);
-        let mut tx_reader = TxRecordReader::new(self.source_csv_path)?;
-        let mut q = TxClusterQueue::new(working_dir);
+        let mut tx_reader = TxRecordReader::new(&self.source_csv_path)?;
+        let mut q = TxClusterQueue::new(&self.csv_cluster_dir);
 
         q.start()?;
         let mut block: usize = 0;
@@ -72,24 +81,20 @@ impl<'a> Processor<'a> {
                 println!(
                     "add to q --> block: {}, num clients: {}",
                     block,
-                    tx_cluster.client_txns().len()
+                    tx_cluster.tx_map().len()
                 );
 
                 rows = 0;
                 block += 1;
                 q.add(tx_cluster)?;
                 tx_cluster = TxCluster::new(block);
-                // block_timer.stop();
                 println!("----------------------------------------------------");
-
-                // block_timer = Timer::start();
             }
         }
 
         // handle rollback
         if let Some(error) = tx_reader.error() {
             let _ = q.stop();
-            let _ = fs::remove_dir_all(working_dir);
             return Err(AppError::new(
                 PATH,
                 "cluster_transactions_by_client",
@@ -99,7 +104,7 @@ impl<'a> Processor<'a> {
         }
 
         // send remaining data to write queue
-        if tx_cluster.client_txns().len() > 0 {
+        if tx_cluster.tx_map().len() > 0 {
             if block > 0 {
                 block += 1;
             }
@@ -107,22 +112,39 @@ impl<'a> Processor<'a> {
             println!(
                 "send remaining data to write queue --> block: {}, num clients: {}",
                 block,
-                tx_cluster.client_txns().len()
+                tx_cluster.tx_map().len()
             );
             q.add(tx_cluster)?;
         }
 
         q.stop()?;
-        // timer.stop();
         Ok(())
     }
 
-    fn summarize_transactions_by_client(&self, working_dir: &str) -> Result<(), AppError> {
-        let summaries = TxSummary::summaries(working_dir)?;
-        let account_dir = self.file_dir(SUMMARY_DIR)?;
-        let mut q = TxSummaryQueue::new(&account_dir, summaries);
+    fn summarize_transactions_by_client(&self) -> Result<(), AppError> {
+        let cluster_paths = TxClusterPath::paths(&self.csv_cluster_dir)?;
+        let mut q = TxSummaryQueue::new(&self.csv_summary_dir, cluster_paths);
         q.start()?;
         q.stop()?;
         Ok(())
+    }
+
+    fn csv_base_dir(source_csv_path: &str, base: &str) -> Result<String, AppError> {
+        let v: Vec<&str> = source_csv_path.split("/").collect();
+        if v.len() > 0 {
+            let file_name = v[v.len() - 1];
+            if file_name.len() > 0 {
+                let v: Vec<&str> = file_name.split(".").collect();
+                return Ok([base, v[0]].join("/"));
+            }
+        }
+        Err(AppError::new(PATH, "file_dir", "01", "invalid file path"))
+    }
+
+    fn cleanup(&self, enable_cleanup: bool) {
+        if enable_cleanup {
+            let _ = fs::remove_dir_all(&self.csv_cluster_dir);
+            let _ = fs::remove_dir_all(&self.csv_summary_dir);
+        }
     }
 }

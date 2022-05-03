@@ -7,8 +7,8 @@ use crate::models::processor::Processor;
 use crate::models::tx_record::{TxRecordReader, TxRecordType};
 
 // dispute
-// - tx doesn't exist
 // - tx exists
+// - tx doesn't exist
 // - dispute on a disputed account
 // - dispute on a resolved account that
 
@@ -25,8 +25,11 @@ fn process_dispute_base_test() {
     // withdraw,1,4,5
     // withdraw,1,5,1
     // dispute,1,1
-    
-    let p = Processor::new("src/tests/csv/dispute_base.csv");
+
+    let result = Processor::new("src/tests/csv/dispute_base.csv");
+    assert!(result.is_ok());
+
+    let p = result.unwrap();
     let result = p.process_csv(false);
     assert!(result.is_ok());
 
@@ -93,6 +96,81 @@ fn process_dispute_base_test() {
     TestHelper::remove_dir(&summary_base);
 }
 
+#[test]
+fn process_dispute_tx_dne_test() {
+    // --------- //
+    // input csv //
+    // --------- //
+
+    // type,client,tx,amount
+    // dispute,1,1
+    // deposit,1,2,5
+    // deposit,1,3,10
+    // withdraw,1,4,1
+    // dispute,1,50
+
+    let result = Processor::new("src/tests/csv/dispute_tx_dne.csv");
+    assert!(result.is_ok());
+    
+    let p = result.unwrap();
+    let result = p.process_csv(false);
+    assert!(result.is_ok());
+
+    // check output files
+    let cluster_base = [CLUSTER_DIR, "dispute_tx_dne"].join("/");
+    let result = TxRecordReader::new(&[&cluster_base, "1", "0.csv"].join("/"));
+    assert!(result.is_ok());
+
+    let mut reader = result.unwrap();
+
+    // dispute,1,1,1
+    assert!(reader.next_record());
+    assert_eq!(reader.tx_record_type(), &TxRecordType::DISPUTE);
+    assert_eq!(reader.tx_record_client(), &1);
+    assert_eq!(reader.tx_record_tx(), &1);
+    assert_eq!(reader.tx_record_amount(), &Decimal::new(0, 0));
+
+    // deposit,1,2,5
+    assert!(reader.next_record());
+    assert_eq!(reader.tx_record_type(), &TxRecordType::DEPOSIT);
+    assert_eq!(reader.tx_record_client(), &1);
+    assert_eq!(reader.tx_record_tx(), &2);
+    assert_eq!(reader.tx_record_amount(), &Decimal::new(5, 0));
+
+    // deposit,1,3,10
+    assert!(reader.next_record());
+    assert_eq!(reader.tx_record_type(), &TxRecordType::DEPOSIT);
+    assert_eq!(reader.tx_record_client(), &1);
+    assert_eq!(reader.tx_record_tx(), &3);
+    assert_eq!(reader.tx_record_amount(), &Decimal::new(10, 0));
+
+    // withdraw,1,4,1
+    assert!(reader.next_record());
+    assert_eq!(reader.tx_record_type(), &TxRecordType::WITHDRAW);
+    assert_eq!(reader.tx_record_client(), &1);
+    assert_eq!(reader.tx_record_tx(), &4);
+    assert_eq!(reader.tx_record_amount(), &Decimal::new(1, 0));
+
+    // dispute,1,50
+    assert!(reader.next_record());
+    assert_eq!(reader.tx_record_type(), &TxRecordType::DISPUTE);
+    assert_eq!(reader.tx_record_client(), &1);
+    assert_eq!(reader.tx_record_tx(), &50);
+    assert_eq!(reader.tx_record_amount(), &Decimal::new(0, 0));
+
+    // check balance
+    let summary_base = [SUMMARY_DIR, "dispute_tx_dne"].join("/");
+
+    let account = Account::new(1, &summary_base);
+    assert_eq!(account.client_id, 1);
+    assert_eq!(account.available, Decimal::new(14, 0));
+    assert_eq!(account.held, Decimal::new(0, 0));
+    assert_eq!(account.total, Decimal::new(14, 0));
+    assert!(!account.locked);
+
+    TestHelper::remove_dir(&cluster_base);
+    TestHelper::remove_dir(&summary_base);
+}
 
 /*
     resolve

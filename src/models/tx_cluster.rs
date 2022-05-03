@@ -1,43 +1,47 @@
-use std::collections::{HashMap, HashSet};
-
 use csv::ByteRecord;
+use std::collections::{HashMap, HashSet};
+use std::fs;
+
+use crate::lib::error::AppError;
+
+const PATH: &str = "model/tx_cluster";
 
 pub trait TxClusterData: Send + Sync + 'static {
     fn block(&self) -> usize;
-    fn client_txns(&self) -> &HashMap<u16, Vec<ByteRecord>>;
-    fn client_conflicts(&self) -> &HashMap<u16, HashSet<u32>>;
+    fn tx_map(&self) -> &HashMap<u16, Vec<ByteRecord>>;
+    fn tx_conflict_map(&self) -> &HashMap<u16, HashSet<u32>>;
 }
 
 pub struct TxCluster {
     block: usize,
-    client_txns: HashMap<u16, Vec<ByteRecord>>,
-    client_conflicts: HashMap<u16, HashSet<u32>>,
+    tx_map: HashMap<u16, Vec<ByteRecord>>,
+    tx_conflict_map: HashMap<u16, HashSet<u32>>,
 }
 
 impl TxCluster {
     pub fn new(block: usize) -> Self {
         Self {
             block,
-            client_txns: HashMap::new(),
-            client_conflicts: HashMap::new(),
+            tx_map: HashMap::new(),
+            tx_conflict_map: HashMap::new(),
         }
     }
 
     pub fn add_tx(&mut self, client_id: &u16, byte_record: &ByteRecord) {
-        if self.client_txns.contains_key(client_id) {
-            self.client_txns.entry(client_id.clone()).and_modify(|e| {
+        if self.tx_map.contains_key(client_id) {
+            self.tx_map.entry(client_id.clone()).and_modify(|e| {
                 e.push(byte_record.clone());
             });
             return;
         }
         let mut v = Vec::new();
         v.push(byte_record.clone());
-        self.client_txns.insert(client_id.clone(), v);
+        self.tx_map.insert(client_id.clone(), v);
     }
 
     pub fn add_conflict(&mut self, client_id: &u16, tx_id: &u32) {
-        if self.client_conflicts.contains_key(client_id) {
-            self.client_conflicts
+        if self.tx_conflict_map.contains_key(client_id) {
+            self.tx_conflict_map
                 .entry(client_id.clone())
                 .and_modify(|e| {
                     e.insert(tx_id.clone());
@@ -46,7 +50,7 @@ impl TxCluster {
         }
         let mut set = HashSet::new();
         set.insert(tx_id.clone());
-        self.client_conflicts.insert(client_id.clone(), set);
+        self.tx_conflict_map.insert(client_id.clone(), set);
     }
 }
 
@@ -55,11 +59,61 @@ impl TxClusterData for TxCluster {
         self.block
     }
 
-    fn client_txns(&self) -> &HashMap<u16, Vec<ByteRecord>> {
-        &self.client_txns
+    fn tx_map(&self) -> &HashMap<u16, Vec<ByteRecord>> {
+        &self.tx_map
     }
 
-    fn client_conflicts(&self) -> &HashMap<u16, HashSet<u32>> {
-        &self.client_conflicts
+    fn tx_conflict_map(&self) -> &HashMap<u16, HashSet<u32>> {
+        &self.tx_conflict_map
+    }
+}
+
+pub trait TxClusterPathData: Send + Sync + 'static {
+    fn client_id(&self) -> u16;
+    fn dir_path(&self) -> &str;
+}
+
+pub struct TxClusterPath {
+    client_id: u16,
+    dir_path: String,
+}
+
+impl TxClusterPath {
+    pub fn paths(cluster_dir: &str) -> Result<Vec<TxClusterPath>, AppError> {
+        let paths = fs::read_dir(cluster_dir)
+            .map_err(|e| AppError::new(PATH, "paths", "00", &e.to_string()))?;
+
+        let paths: Vec<TxClusterPath> = paths
+            .map(|e| {
+                if let Ok(path) = e {
+                    if path.path().is_dir() {
+                        let dir_path = path.path().display().to_string();
+                        let pos = dir_path.rfind("/").unwrap();
+                        let client_id: u16 = dir_path[(pos + 1)..].parse::<u16>().unwrap();
+                        return TxClusterPath {
+                            client_id,
+                            dir_path,
+                        };
+                    }
+                }
+                TxClusterPath {
+                    client_id: 0,
+                    dir_path: "".to_string(),
+                }
+            })
+            .filter(|s| s.dir_path.len() > 0)
+            .collect();
+
+        Ok(paths)
+    }
+}
+
+impl TxClusterPathData for TxClusterPath {
+    fn client_id(&self) -> u16 {
+        self.client_id
+    }
+
+    fn dir_path(&self) -> &str {
+        &self.dir_path
     }
 }

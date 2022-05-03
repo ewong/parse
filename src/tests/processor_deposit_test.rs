@@ -22,7 +22,10 @@ fn process_deposit_test() {
     // deposit,3,7,2
     // deposit,1,8,2
 
-    let p = Processor::new("src/tests/csv/deposit.csv");
+    let result = Processor::new("src/tests/csv/deposit.csv");
+    assert!(result.is_ok());
+    
+    let p = result.unwrap();
     assert!(p.process_csv(false).is_ok());
 
     // check output files
@@ -64,7 +67,9 @@ fn process_deposit_test() {
     // client 2 //
     // -------- //
 
-    assert!(reader.set_reader(&[&cluster_base, "2", "0.csv"].join("/")).is_ok());
+    assert!(reader
+        .set_reader(&[&cluster_base, "2", "0.csv"].join("/"))
+        .is_ok());
 
     // deposit,2,2,1
     assert!(reader.next_record());
@@ -91,7 +96,9 @@ fn process_deposit_test() {
     // client 3 //
     // -------- //
 
-    assert!(reader.set_reader(&[&cluster_base, "3", "0.csv"].join("/")).is_ok());
+    assert!(reader
+        .set_reader(&[&cluster_base, "3", "0.csv"].join("/"))
+        .is_ok());
 
     // deposit,3,3,1
     assert!(reader.next_record());
@@ -118,7 +125,9 @@ fn process_deposit_test() {
     // client 4 //
     // -------- //
 
-    assert!(reader.set_reader(&[&cluster_base, "4", "0.csv"].join("/")).is_ok());
+    assert!(reader
+        .set_reader(&[&cluster_base, "4", "0.csv"].join("/"))
+        .is_ok());
 
     // deposit,4,4,1
     assert!(reader.next_record());
