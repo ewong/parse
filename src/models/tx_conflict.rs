@@ -2,6 +2,8 @@ use rust_decimal::prelude::*;
 use std::io::Read;
 use std::{collections::HashMap, fs};
 
+use crate::lib::constants::ACCOUNT_DIR;
+
 use super::tx_record::{TxRecordReader, TxRecordType};
 
 #[derive(Debug, Clone)]
@@ -17,54 +19,13 @@ pub struct TxConflict {
 }
 
 impl TxConflict {
-    pub fn new(tx_dir: &str) -> Self {
+    pub fn new(client_id: &u16, tx_dir: &str) -> Self {
         let mut s = Self {
             map: HashMap::new(),
         };
-        s.load_csv_map(tx_dir);
         s.load_txt_map(tx_dir);
+        s.load_csv_map(client_id, tx_dir);
         s
-    }
-
-    fn load_csv_map(&mut self, tx_dir: &str) {
-        let opt = Self::conflict_paths(tx_dir, "csv");
-        if opt.is_none() {
-            return;
-        }
-
-        let paths = opt.unwrap();
-        let result = TxRecordReader::new(&paths.get(0).unwrap());
-        if result.is_err() {
-            return;
-        }
-        let mut tx_reader = result.unwrap();
-        let mut initial_loop = true;
-
-        for path in paths {
-            if initial_loop {
-                let result = tx_reader.set_reader(&path);
-                if result.is_err() {
-                    return;
-                }
-                initial_loop = false;
-            }
-
-            while tx_reader.next_record() {
-                if let Some(_e) = tx_reader.error() {
-                    return;
-                }
-                if !self.map.contains_key(tx_reader.tx_record_tx()) {
-                    self.map.insert(
-                        tx_reader.tx_record_tx().clone(),
-                        TxConflictState {
-                            state: TxRecordType::NONE,
-                            tx_type: tx_reader.tx_record_type().clone(),
-                            amount: tx_reader.tx_record_amount().clone(),
-                        },
-                    );
-                }
-            }
-        }
     }
 
     fn load_txt_map(&mut self, tx_dir: &str) {
@@ -97,6 +58,69 @@ impl TxConflict {
                             },
                         );
                     }
+                }
+            }
+        }
+    }
+
+    fn load_csv_map(&mut self, client_id: &u16, tx_dir: &str) {
+        let opt = Self::conflict_paths(tx_dir, "csv");
+        if opt.is_none() {
+            return;
+        }
+
+        let paths = opt.unwrap();
+        let result = TxRecordReader::new(&paths.get(0).unwrap());
+        if result.is_err() {
+            return;
+        }
+        let mut tx_reader = result.unwrap();
+
+        // first load all txt
+        for (tx_id, conflict) in &mut self.map {
+            let file_path = &[
+                ACCOUNT_DIR,
+                "/",
+                &client_id.to_string(),
+                "/conflicts/",
+                &tx_id.to_string(),
+                ".csv",
+            ]
+            .join("");
+            let result = tx_reader.set_reader(&file_path);
+            if result.is_err() {
+                continue;
+            }
+            if tx_reader.next_record() {
+                conflict.tx_type = tx_reader.tx_record_type().clone();
+                conflict.amount = tx_reader.tx_record_amount().clone();
+            }
+        }
+
+        // then load csv
+        let mut initial_loop = true;
+        for path in paths {
+            if initial_loop {
+                let result = tx_reader.set_reader(&path);
+                if result.is_err() {
+                    return;
+                }
+                initial_loop = false;
+            }
+
+            while tx_reader.next_record() {
+                if let Some(_e) = tx_reader.error() {
+                    return;
+                }
+                if !self.map.contains_key(tx_reader.tx_record_tx()) {
+                    self.map.insert(
+                        tx_reader.tx_record_tx().clone(),
+                        TxConflictState {
+                            state: TxRecordType::NONE,
+                            tx_type: tx_reader.tx_record_type().clone(),
+                            amount: tx_reader.tx_record_amount().clone(),
+                        },
+                    );
                 }
             }
         }
