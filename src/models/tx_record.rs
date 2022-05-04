@@ -1,3 +1,4 @@
+use csv::Reader;
 use rust_decimal::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::str;
@@ -113,28 +114,28 @@ pub struct TxRecordSmall<'a> {
     pub tx_id: u32,
 }
 
-#[derive(Debug, Clone, Copy)]
-pub struct TxRow {
-    pub type_id: u8,
-    pub client_id: u16,
-    pub tx_id: u32,
-    pub amount: Decimal,
-}
+// #[derive(Debug, Clone, Copy)]
+// pub struct TxRow {
+//     pub type_id: u8,
+//     pub client_id: u16,
+//     pub tx_id: u32,
+//     pub amount: Decimal,
+// }
 
-impl TxRow {
-    pub fn new() -> Self {
-        Self {
-            type_id: 0,
-            client_id: 0,
-            tx_id: 0,
-            amount: Decimal::new(0, 0),
-        }
-    }
+// impl TxRow {
+//     pub fn new() -> Self {
+//         Self {
+//             type_id: 0,
+//             client_id: 0,
+//             tx_id: 0,
+//             amount: Decimal::new(0, 0),
+//         }
+//     }
 
-    pub fn set(&mut self, type_id: u8, client_id: u16, tx_id: u32, amount: Decimal) {
-        self.type_id = type_id;
-        self.client_id = client_id;
-        self.tx_id = tx_id;
-        self.amount = amount;
-    }
-}
+//     pub fn set(&mut self, type_id: u8, client_id: u16, tx_id: u32, amount: Decimal) {
+//         self.type_id = type_id;
+//         self.client_id = client_id;
+//         self.tx_id = tx_id;
+//         self.amount = amount;
+//     }
+// }

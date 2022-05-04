@@ -5,11 +5,11 @@ use std::sync::{Arc, RwLock};
 use crate::lib::constants::ACCOUNT_DIR;
 use crate::lib::error::AppError;
 use crate::lib::tx_queue::TxQueue;
-use crate::models::tx_record::TxRecordReader;
 
 use super::account::Account;
 use super::tx_cluster::TxClusterPathData;
-use super::tx_conflict::TxConflict;
+use super::tx_history::TxHistory;
+use super::tx_reader::TxRecordReader;
 
 const PATH: &str = "model/client_queue";
 const FN_PROCESS_ENTRY: &str = "process_entry";
@@ -145,7 +145,7 @@ where
             return Ok(());
         }
 
-        let mut tx_conflict = TxConflict::new(&entry.client_id(), entry.dir_path());
+        let mut tx_history = TxHistory::new(&entry.client_id(), entry.dir_path());
         let mut account = Account::new(entry.client_id(), ACCOUNT_DIR);
         let mut tx_reader = TxRecordReader::new(&file_paths.get(0).unwrap())?;
         let mut initial_loop = true;
@@ -160,12 +160,26 @@ where
                 if let Some(e) = tx_reader.error() {
                     return Err(AppError::new(PATH, FN_PROCESS_ENTRY, "01", &e.to_string()));
                 }
+
+                if *tx_reader.tx_record_client() != entry.client_id() {
+                    continue;
+                }
+
                 account.handle_tx(
                     tx_reader.tx_record_type(),
                     tx_reader.tx_record_tx(),
                     tx_reader.tx_record_amount(),
-                    &mut tx_conflict,
+                    &mut tx_history,
                 );
+
+                tx_history.set_tx(
+                    tx_reader.tx_record_type(),
+                    tx_reader.tx_record_client(),
+                    tx_reader.tx_record_tx(),
+                    tx_reader.tx_record_amount(),
+                );
+
+                tx_history.get_tx(tx_reader.tx_record_tx());
             }
         }
 

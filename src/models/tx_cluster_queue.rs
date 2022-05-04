@@ -2,7 +2,7 @@ use crossbeam_channel::{Receiver, Sender};
 use std::sync::{Arc, RwLock};
 
 use super::tx_cluster::TxClusterData;
-use super::tx_record::TxRecordWriter;
+use super::tx_writer::TxWriter;
 use crate::lib::error::AppError;
 use crate::lib::tx_queue::TxQueue;
 
@@ -80,32 +80,32 @@ where
     }
 
     fn process_entry(out_dir: &str, entry: &T) -> Result<(), AppError> {
-        let mut wtr_opt: Option<TxRecordWriter> = None;
+        let mut wtr_opt: Option<TxWriter> = None;
 
         for (client_id, records) in entry.tx_map() {
             let dir_path = [out_dir, "/", &client_id.to_string()].join("");
             let file_name = &entry.block().to_string();
 
             if wtr_opt.is_none() {
-                wtr_opt = Some(TxRecordWriter::new(&dir_path, &file_name)?);
+                wtr_opt = Some(TxWriter::new(&dir_path, &file_name)?);
             }
 
             if let Some(wtr) = &mut wtr_opt {
                 wtr.set_writer(&dir_path, &file_name)?;
                 wtr.write_records(records)?;
-                if let Some(set) = entry.tx_conflict_map().get(client_id) {
-                    if let Some(deposit_withdraw_map) =
-                        entry.tx_deposit_withdraw_map().get(client_id)
-                    {
-                        wtr.write_conflicts(
-                            &dir_path,
-                            &file_name,
-                            set,
-                            deposit_withdraw_map,
-                            records,
-                        )?;
-                    }
-                }
+                // if let Some(set) = entry.tx_conflict_map().get(client_id) {
+                //     if let Some(deposit_withdraw_map) =
+                //         entry.tx_deposit_withdraw_map().get(client_id)
+                //     {
+                //         wtr.write_conflicts(
+                //             &dir_path,
+                //             &file_name,
+                //             set,
+                //             deposit_withdraw_map,
+                //             records,
+                //         )?;
+                //     }
+                // }
             }
         }
 
