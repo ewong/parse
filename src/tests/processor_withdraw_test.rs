@@ -4,7 +4,8 @@ use super::helpers::helper::TestHelper;
 use crate::lib::constants::{CLUSTER_DIR, SUMMARY_DIR};
 use crate::models::account::Account;
 use crate::models::processor::Processor;
-use crate::models::tx_record::{TxRecordReader, TxRecordType};
+use crate::models::tx_reader::TxReader;
+use crate::models::tx_record::TxRecordType;
 
 #[test]
 fn process_withdraw_test() {
@@ -31,7 +32,7 @@ fn process_withdraw_test() {
 
     // check output files
     let cluster_base = [CLUSTER_DIR, "withdraw"].join("/");
-    let result = TxRecordReader::new(&[&cluster_base, "1", "0.csv"].join("/"));
+    let result = TxReader::new(&[&cluster_base, "1", "0.csv"].join("/"));
     assert!(result.is_ok());
 
     let mut reader = result.unwrap();

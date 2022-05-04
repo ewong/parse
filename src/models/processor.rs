@@ -2,6 +2,7 @@ use std::time::Duration;
 use std::{fs, thread};
 
 use super::balancer::Balancer;
+use super::tx_reader::TxReader;
 use crate::lib::constants::{ACCOUNT_DIR, FN_NEW, PROCESS_DIR, TRANSACTION_DIR};
 use crate::lib::error::AppError;
 use crate::lib::timer::Timer;
@@ -44,11 +45,29 @@ impl<'a> Processor<'a> {
 
     pub fn process_csv(&self, enable_cleanup: bool) -> Result<(), AppError> {
         let timer = Timer::start();
+        let mut tx_reader = TxReader::new(&self.source_csv_path)?;
         let mut balancer = Balancer::new();
         balancer.start()?;
-        thread::sleep(Duration::from_millis(1000));
-        balancer.stop()?;
+
+        while tx_reader.next_record() {
+            tx_reader.show();
+            // handle rollback
+            if let Some(error) = tx_reader.error() {
+                let _ = balancer.stop();
+                self.cleanup(enable_cleanup);
+                return Err(AppError::new(
+                    PATH,
+                    "cluster_transactions_by_client",
+                    "00",
+                    error,
+                ));
+            }
+        }
+
+        let _ = balancer.stop();
+        self.cleanup(enable_cleanup);
         timer.stop();
+
         Ok(())
     }
 

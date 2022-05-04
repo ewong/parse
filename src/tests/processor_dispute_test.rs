@@ -4,7 +4,8 @@ use super::helpers::helper::TestHelper;
 use crate::lib::constants::{CLUSTER_DIR, SUMMARY_DIR};
 use crate::models::account::Account;
 use crate::models::processor::Processor;
-use crate::models::tx_record::{TxRecordReader, TxRecordType};
+use crate::models::tx_reader::TxReader;
+use crate::models::tx_record::TxRecordType;
 
 // dispute
 // - tx exists
@@ -35,7 +36,7 @@ fn process_dispute_base_test() {
 
     // check output files
     let cluster_base = [CLUSTER_DIR, "dispute_base"].join("/");
-    let result = TxRecordReader::new(&[&cluster_base, "1", "0.csv"].join("/"));
+    let result = TxReader::new(&[&cluster_base, "1", "0.csv"].join("/"));
     assert!(result.is_ok());
 
     let mut reader = result.unwrap();
@@ -118,7 +119,7 @@ fn process_dispute_tx_dne_test() {
 
     // check output files
     let cluster_base = [CLUSTER_DIR, "dispute_tx_dne"].join("/");
-    let result = TxRecordReader::new(&[&cluster_base, "1", "0.csv"].join("/"));
+    let result = TxReader::new(&[&cluster_base, "1", "0.csv"].join("/"));
     assert!(result.is_ok());
 
     let mut reader = result.unwrap();

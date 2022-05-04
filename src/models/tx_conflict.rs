@@ -4,7 +4,8 @@ use std::{collections::HashMap, fs};
 
 use crate::lib::constants::ACCOUNT_DIR;
 
-use super::tx_record::{TxRecordReader, TxRecordType};
+use super::tx_record::TxRecordType;
+use super::tx_reader::TxReader;
 
 #[derive(Debug, Clone)]
 pub struct TxConflictState {
@@ -70,7 +71,7 @@ impl TxConflict {
         }
 
         let paths = opt.unwrap();
-        let result = TxRecordReader::new(&paths.get(0).unwrap());
+        let result = TxReader::new(&paths.get(0).unwrap());
         if result.is_err() {
             return;
         }
