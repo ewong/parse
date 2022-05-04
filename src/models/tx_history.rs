@@ -13,7 +13,22 @@ pub struct TxHistory {
 
 impl TxHistory {
     pub fn new(client_id: &u16) -> Self {
-        let path = [TRANSACTION_DIR, "/", &client_id.to_string(), "_db"].join("");
+        let path: String;
+        if cfg!(test) {
+            use uuid::Uuid;
+            let id = Uuid::new_v4();
+            path = [
+                TRANSACTION_DIR,
+                "/",
+                &client_id.to_string(),
+                "_db_",
+                &id.to_string(),
+            ]
+            .join("");
+        } else {
+            path = [TRANSACTION_DIR, "/", &client_id.to_string(), "_db"].join("");
+        }
+
         let db = sled::open(path).unwrap();
         let cache = HashMap::new();
         Self {

@@ -32,7 +32,7 @@ fn process_withdraw_test() {
 
     // check output files
     let cluster_base = [CLUSTER_DIR, "withdraw"].join("/");
-    let result = TxRecordReader::new(&[&cluster_base, "1", "0.csv"].join("/"));
+    let result = TxRecordReader::new(&[&cluster_base, "7", "0.csv"].join("/"));
     assert!(result.is_ok());
 
     let mut reader = result.unwrap();
@@ -96,8 +96,8 @@ fn process_withdraw_test() {
     // check balance
     let summary_base = [SUMMARY_DIR, "withdraw"].join("/");
 
-    let account = Account::new(1, &summary_base);
-    assert_eq!(account.client_id, 1);
+    let account = Account::new(7, &summary_base);
+    assert_eq!(account.client_id, 7);
     assert_eq!(account.available, Decimal::new(9, 0));
     assert_eq!(account.held, Decimal::new(0, 0));
     assert_eq!(account.total, Decimal::new(9, 0));
