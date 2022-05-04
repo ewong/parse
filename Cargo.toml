@@ -12,6 +12,7 @@ csv = "1.1.6"
 crossbeam-channel = "0.5.4"
 chrono = "0.4.19"
 rust_decimal = { version = "1.23.1", features = ["serde-with-str"] }
+sled = "0.34.7"
 
 [profile.dev]
 opt-level = 1

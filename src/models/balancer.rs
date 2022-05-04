@@ -1,10 +1,10 @@
 use crossbeam_channel::{bounded, select, unbounded, Receiver, Sender};
-use std::collections::{HashMap, HashSet};
+// use std::collections::{HashMap, HashSet};
 use std::thread;
 use std::time::Duration;
 
+use super::tx_record::TxRow;
 use crate::lib::error::AppError;
-use crate::models::tx_record::TxRecord;
 
 const PATH: &str = "model/balancer";
 const MIN_NUM_THREADS: u16 = 4;
@@ -13,7 +13,7 @@ const THREAD_SLEEP_DURATION: u64 = 250;
 
 pub struct Balancer {
     started: bool,
-    tx: Option<Sender<Option<&'static TxRecord<'static>>>>,
+    tx: Option<Sender<Option<TxRow>>>,
     rx: Option<Receiver<Result<bool, AppError>>>,
 }
 
@@ -34,7 +34,7 @@ impl Balancer {
         Ok(())
     }
 
-    pub fn add(&self, tx_record: &'static TxRecord) -> Result<(), AppError> {
+    pub fn add(&self, tx_row: TxRow) -> Result<(), AppError> {
         if let Some(tx) = &self.tx {
             loop {
                 if tx.len() >= MAX_NUM_RECORDS {
@@ -43,8 +43,10 @@ impl Balancer {
                     break;
                 }
             }
-            tx.send(Some(tx_record))
+            println!("send tx row: {:?}", tx_row);
+            tx.send(Some(tx_row))
                 .map_err(|e| AppError::new(PATH, "add", "00", &e.to_string()))?;
+            println!("send data");
         }
         Ok(())
     }
@@ -82,8 +84,8 @@ impl Balancer {
         thread::spawn(move || {
             let mut num_threads = MIN_NUM_THREADS;
 
-            let mut tx_vec: Vec<Sender<Option<TxRecord>>> = Vec::new();
-            let mut rx_vec: Vec<Receiver<Result<bool, AppError>>> = Vec::new();
+            let mut tx_vec: Vec<Sender<Option<TxRow>>> = Vec::new();
+            let mut rx_vec: Vec<Receiver<Result<u16, AppError>>> = Vec::new();
 
             // start with 4 workers
             for wid in 0..num_threads {
@@ -93,16 +95,16 @@ impl Balancer {
                 tx_vec.push(balancer_tx);
                 rx_vec.push(balancer_rx);
 
-                let tx = worker_tx.clone();
-                let rx = worker_rx.clone();
+                let to_balancer = worker_tx.clone();
+                let from_balancer = worker_rx.clone();
 
                 thread::spawn(move || loop {
                     select! {
-                        recv(rx) -> packet => {
+                        recv(from_balancer) -> packet => {
                             if let Some(record) = packet.unwrap() {
-                                println!("{:?}", record);
+                                println!("worker {} received --> {:?}", wid, record);
                             } else {
-                                tx.send(Ok(true)).unwrap();
+                                to_balancer.send(Ok(1)).unwrap();
                                 println!("worker {} shutdown", wid);
                                 break;
                             }
@@ -116,9 +118,18 @@ impl Balancer {
             // let mut map: HashMap<u16, HashSet<u16>> = HashMap::new(); // <worker id, client id>
             loop {
                 select! {
-                    // recv() -> _ => STAT.print(),
-                    recv(from_parent) -> packet => {
-                        if packet.unwrap().is_none() {
+                    recv(from_parent) -> wrapper => {
+                        let mut shutdown = false;
+                        if wrapper.is_err() {
+                            shutdown = true;
+                        }
+
+                        let packet = wrapper.unwrap();
+                        if packet.is_none() {
+                            shutdown = true;
+                        }
+
+                        if shutdown {
                             for t in tx_vec {
                                 t.send(None).unwrap();
                             }
@@ -129,6 +140,11 @@ impl Balancer {
                             println!("balancer shutting down");
                             break;
                         }
+
+                        let tx_row = packet.unwrap();
+                        println!("balancer got data: {:?}", tx_row);
+                        let t = tx_vec.get(0).unwrap();
+                        t.send(Some(tx_row)).unwrap();
                     },
                 }
             }

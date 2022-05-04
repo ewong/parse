@@ -1,8 +1,8 @@
-use std::time::Duration;
-use std::{fs, thread};
+use std::fs;
 
 use super::balancer::Balancer;
 use super::tx_reader::TxReader;
+use super::tx_record::{TxRecord, TxRow};
 use crate::lib::constants::{ACCOUNT_DIR, FN_NEW, PROCESS_DIR, TRANSACTION_DIR};
 use crate::lib::error::AppError;
 use crate::lib::timer::Timer;
@@ -49,9 +49,9 @@ impl<'a> Processor<'a> {
         let mut balancer = Balancer::new();
         balancer.start()?;
 
-        while tx_reader.next_record() {
-            tx_reader.show();
-            // handle rollback
+        let mut tx_row = TxRow::new();
+        while tx_reader.next_record(&mut tx_row) {
+            balancer.add(tx_row)?;
             if let Some(error) = tx_reader.error() {
                 let _ = balancer.stop();
                 self.cleanup(enable_cleanup);
