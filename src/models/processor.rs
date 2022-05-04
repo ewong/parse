@@ -70,24 +70,7 @@ impl<'a> Processor<'a> {
         let mut rows: usize = 0;
 
         while tx_reader.next_record() {
-            tx_cluster.add(
-                tx_reader.tx_record_type(),
-                tx_reader.tx_record_client(),
-                tx_reader.tx_record_tx(),
-                tx_reader.byte_record(),
-            );
-            // tx_cluster.add_tx(
-            //     tx_reader.tx_record_type(),
-            //     tx_reader.tx_record_client(),
-            //     tx_reader.tx_record_tx(),
-            //     tx_reader.byte_record(),
-            // );
-
-            // tx_cluster.add_conflict(
-            //     tx_reader.tx_record_type(),
-            //     tx_reader.tx_record_client(),
-            //     tx_reader.tx_record_tx(),
-            // );
+            tx_cluster.add(tx_reader.tx_record_client(), tx_reader.byte_record());
 
             rows += 1;
             if rows == BLOCK_SIZE {

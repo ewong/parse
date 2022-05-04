@@ -88,10 +88,10 @@ impl Account {
                 self.available += *amount;
                 self.total += *amount;
 
-                // println!(
-                //     "deposit --> client {}, available: {}, held: {}, total: {}, locked: {}",
-                //     self.client_id, self.available, self.held, self.total, self.locked
-                // );
+                println!(
+                    "deposit --> client {}, available: {}, held: {}, total: {}, locked: {}",
+                    self.client_id, self.available, self.held, self.total, self.locked
+                );
             }
             TxRecordType::WITHDRAW => {
                 if self.locked {
@@ -100,10 +100,10 @@ impl Account {
                 if self.available >= *amount {
                     self.available -= *amount;
                     self.total -= *amount;
-                    // println!(
-                    //     "withdraw --> client {}, available: {}, held: {}, total: {}, locked: {}",
-                    //     self.client_id, self.available, self.held, self.total, self.locked
-                    // );
+                    println!(
+                        "withdraw --> client {}, available: {}, held: {}, total: {}, locked: {}",
+                        self.client_id, self.available, self.held, self.total, self.locked
+                    );
                 }
             }
             TxRecordType::DISPUTE => {
@@ -111,74 +111,82 @@ impl Account {
                     return;
                 }
 
-                // if tx_conflict.map.contains_key(tx_id) {
-                //     tx_conflict.map.entry(tx_id.clone()).and_modify(|e| {
-                //         if e.state == TxRecordType::NONE {
-                //             e.state = TxRecordType::DISPUTE;
-                //             if e.tx_type == TxRecordType::DEPOSIT {
-                //                 self.held += e.amount;
-                //                 self.available -= e.amount;
-                //             }
-                //             // if the dispute is on a withdrawal we do nothing.
-                //             // withdrawal chargebacks are handled like debit card/atm chargebacks.
-                //             // debit card/atm chargebacks only revert transaction on the chargeback.
-                //             // println!(
-                //             //     "dispute --> tx_id: {}, client {}, available: {}, held: {}, total: {}, locked: {}",
-                //             //     tx_id, self.client_id, self.available, self.held, self.total, self.locked
-                //             // );
-                //         }
-                //     });
-                // }
+                if let Some(tx) = &mut tx_history.get_tx(tx_id) {
+                    if tx.conflict_type_id != TxRecordType::NONE {
+                        return;
+                    }
+
+                    if tx.type_id == TxRecordType::DEPOSIT {
+                        self.held += tx.amount;
+                        self.available -= tx.amount;
+                    }
+                    // if the dispute is on a withdrawal we do nothing.
+                    // withdrawal chargebacks are handled like debit card/atm chargebacks.
+                    // debit card/atm chargebacks only revert transaction on the chargeback.
+
+                    tx.conflict_type_id = TxRecordType::DISPUTE;
+                    tx_history.set_tx(&tx.type_id, &tx.client_id, &tx.tx_id, &tx.amount);
+                    println!(
+                        "dispute --> tx_id: {}, client {}, available: {}, held: {}, total: {}, locked: {}",
+                        tx_id, self.client_id, self.available, self.held, self.total, self.locked
+                    );
+                }
             }
             TxRecordType::RESOLVE => {
                 if self.locked {
                     return;
                 }
 
-                // if tx_conflict.map.contains_key(tx_id) {
-                //     tx_conflict.map.entry(tx_id.clone()).and_modify(|e| {
-                //         if e.state == TxRecordType::DISPUTE {
-                //             e.state = TxRecordType::RESOLVE;
-                //             if e.tx_type == TxRecordType::DEPOSIT {
-                //                 self.held -= e.amount;
-                //                 self.available += e.amount;
-                //             }
-                //             // if the resolve is on a withdrawal we do nothing.
-                //             // withdrawal chargebacks are handled like debit card/atm chargebacks.
-                //             // debit card/atm chargebacks only revert transaction on the chargeback.
-                //             // println!(
-                //             //     "resolve --> tx_id: {}, client {}, available: {}, held: {}, total: {}, locked: {}",
-                //             //     tx_id, self.client_id, self.available, self.held, self.total, self.locked
-                //             // );
-                //         }
-                //     });
-                // }
+                if let Some(tx) = &mut tx_history.get_tx(tx_id) {
+                    if tx.conflict_type_id != TxRecordType::DISPUTE {
+                        return;
+                    }
+
+                    if tx.type_id == TxRecordType::DEPOSIT {
+                        self.held -= tx.amount;
+                        self.available += tx.amount;
+                    }
+                    // if the resolve is on a withdrawal we do nothing.
+                    // withdrawal chargebacks are handled like debit card/atm chargebacks.
+                    // debit card/atm chargebacks only revert transaction on the chargeback.
+
+                    tx.conflict_type_id = TxRecordType::RESOLVE;
+                    tx_history.set_tx(&tx.type_id, &tx.client_id, &tx.tx_id, &tx.amount);
+
+                    println!(
+                        "resolve --> tx_id: {}, client {}, available: {}, held: {}, total: {}, locked: {}",
+                        tx_id, self.client_id, self.available, self.held, self.total, self.locked
+                    );
+                }
             }
             TxRecordType::CHARGEBACK => {
                 if self.locked {
                     return;
                 }
 
-                // if tx_conflict.map.contains_key(tx_id) {
-                //     tx_conflict.map.entry(tx_id.clone()).and_modify(|e| {
-                //         if e.state == TxRecordType::DISPUTE {
-                //             e.state = TxRecordType::CHARGEBACK;
-                //             if e.tx_type == TxRecordType::DEPOSIT {
-                //                 self.held -= e.amount;
-                //                 self.total -= e.amount;
-                //             } else if e.tx_type == TxRecordType::WITHDRAW {
-                //                 // if the chargeback is on a withdrawal reimburse the client the amount of the withdrawal.
-                //                 self.available += e.amount;
-                //                 self.total += e.amount;
-                //             }
-                //             // println!(
-                //             //     "chargeback --> tx_id: {}, client {}, available: {}, held: {}, total: {}, locked: {}",
-                //             //     tx_id, self.client_id, self.available, self.held, self.total, self.locked
-                //             // );
-                //             self.locked = true;
-                //         }
-                //     });
-                // }
+                if let Some(tx) = &mut tx_history.get_tx(tx_id) {
+                    if tx.conflict_type_id != TxRecordType::DISPUTE {
+                        return;
+                    }
+
+                    if tx.type_id == TxRecordType::DEPOSIT {
+                        self.held -= tx.amount;
+                        self.total -= tx.amount;
+                    } else if tx.type_id == TxRecordType::WITHDRAW {
+                        // if the chargeback is on a withdrawal reimburse the client the amount of the withdrawal.
+                        self.available += tx.amount;
+                        self.total += tx.amount;
+                    }
+
+                    tx.conflict_type_id = TxRecordType::CHARGEBACK;
+                    tx_history.set_tx(&tx.type_id, &tx.client_id, &tx.tx_id, &tx.amount);
+                    self.locked = true;
+
+                    println!(
+                        "chargeback --> tx_id: {}, client {}, available: {}, held: {}, total: {}, locked: {}",
+                        tx_id, self.client_id, self.available, self.held, self.total, self.locked
+                    );
+                }
             }
             _ => {}
         }

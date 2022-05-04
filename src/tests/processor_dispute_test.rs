@@ -20,12 +20,12 @@ fn process_dispute_base_test() {
     // --------- //
 
     // type,client,tx,amount
-    // deposit,1,1,1
-    // deposit,1,2,1
-    // deposit,1,3,1
-    // withdraw,1,4,5
-    // withdraw,1,5,1
-    // dispute,1,1
+    // deposit,5,1,1
+    // deposit,5,2,1
+    // deposit,5,3,1
+    // withdraw,5,4,5
+    // withdraw,5,5,1
+    // dispute,5,1
 
     let result = Processor::new("src/tests/csv/dispute_base.csv");
     assert!(result.is_ok());
@@ -104,11 +104,11 @@ fn process_dispute_tx_dne_test() {
     // --------- //
 
     // type,client,tx,amount
-    // dispute,1,1
-    // deposit,1,2,5
-    // deposit,1,3,10
-    // withdraw,1,4,1
-    // dispute,1,50
+    // dispute,6,1
+    // deposit,6,2,5
+    // deposit,6,3,10
+    // withdraw,6,4,1
+    // dispute,6,50
 
     let result = Processor::new("src/tests/csv/dispute_tx_dne.csv");
     assert!(result.is_ok());
@@ -124,38 +124,38 @@ fn process_dispute_tx_dne_test() {
 
     let mut reader = result.unwrap();
 
-    // dispute,1,1,1
+    // dispute,6,1
     assert!(reader.next_record());
     assert_eq!(reader.tx_record_type(), &TxRecordType::DISPUTE);
-    assert_eq!(reader.tx_record_client(), &1);
+    assert_eq!(reader.tx_record_client(), &6);
     assert_eq!(reader.tx_record_tx(), &1);
     assert_eq!(reader.tx_record_amount(), &Decimal::new(0, 0));
 
-    // deposit,1,2,5
+    // deposit,6,2,5
     assert!(reader.next_record());
     assert_eq!(reader.tx_record_type(), &TxRecordType::DEPOSIT);
-    assert_eq!(reader.tx_record_client(), &1);
+    assert_eq!(reader.tx_record_client(), &6);
     assert_eq!(reader.tx_record_tx(), &2);
     assert_eq!(reader.tx_record_amount(), &Decimal::new(5, 0));
 
-    // deposit,1,3,10
+    // deposit,6,3,10
     assert!(reader.next_record());
     assert_eq!(reader.tx_record_type(), &TxRecordType::DEPOSIT);
-    assert_eq!(reader.tx_record_client(), &1);
+    assert_eq!(reader.tx_record_client(), &6);
     assert_eq!(reader.tx_record_tx(), &3);
     assert_eq!(reader.tx_record_amount(), &Decimal::new(10, 0));
 
-    // withdraw,1,4,1
+    // withdraw,6,4,1
     assert!(reader.next_record());
     assert_eq!(reader.tx_record_type(), &TxRecordType::WITHDRAW);
-    assert_eq!(reader.tx_record_client(), &1);
+    assert_eq!(reader.tx_record_client(), &6);
     assert_eq!(reader.tx_record_tx(), &4);
     assert_eq!(reader.tx_record_amount(), &Decimal::new(1, 0));
 
-    // dispute,1,50
+    // dispute,6,50
     assert!(reader.next_record());
     assert_eq!(reader.tx_record_type(), &TxRecordType::DISPUTE);
-    assert_eq!(reader.tx_record_client(), &1);
+    assert_eq!(reader.tx_record_client(), &6);
     assert_eq!(reader.tx_record_tx(), &50);
     assert_eq!(reader.tx_record_amount(), &Decimal::new(0, 0));
 

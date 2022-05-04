@@ -1,19 +1,6 @@
-use csv::Reader;
 use rust_decimal::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::str;
-
-const PATH: &str = "models/tx_record";
-
-const TYPE_POS: usize = 0;
-
-const TYPE_COL: &str = "type";
-const CLIENT_COL: &str = "client";
-const TX_COL: &str = "tx";
-const AMOUNT_COL: &str = "amount";
-
-const FN_WRITE_RECORDS: &str = "writer_records";
-const FN_WRITE_CONFLICTS: &str = "write_conflicts";
 
 const B_DEPOSIT: &[u8] = b"deposit";
 const B_WITHDRAW: &[u8] = b"withdraw";
@@ -62,25 +49,36 @@ impl TxRecordType {
         Self::NONE
     }
 
-    pub fn as_binary(&self) -> &[u8] {
-        match self {
-            Self::DEPOSIT => B_DEPOSIT,
-            Self::WITHDRAW => B_WITHDRAW,
-            Self::DISPUTE => B_DISPUTE,
-            Self::RESOLVE => B_RESOLVE,
-            Self::CHARGEBACK => B_CHARGEBACK,
-            _ => b"",
-        }
-    }
+    // pub fn as_binary(&self) -> &[u8] {
+    //     match self {
+    //         Self::DEPOSIT => B_DEPOSIT,
+    //         Self::WITHDRAW => B_WITHDRAW,
+    //         Self::DISPUTE => B_DISPUTE,
+    //         Self::RESOLVE => B_RESOLVE,
+    //         Self::CHARGEBACK => B_CHARGEBACK,
+    //         _ => b"",
+    //     }
+    // }
 
-    pub fn as_u8(&self) -> u8 {
+    // pub fn as_u8(&self) -> u8 {
+    //     match self {
+    //         Self::DEPOSIT => 0,
+    //         Self::WITHDRAW => 1,
+    //         Self::DISPUTE => 2,
+    //         Self::RESOLVE => 3,
+    //         Self::CHARGEBACK => 4,
+    //         _ => 5,
+    //     }
+    // }
+
+    pub fn to_string(&self) -> String {
         match self {
-            Self::DEPOSIT => 0,
-            Self::WITHDRAW => 1,
-            Self::DISPUTE => 2,
-            Self::RESOLVE => 3,
-            Self::CHARGEBACK => 4,
-            _ => 5,
+            Self::DEPOSIT => "deposit".to_string(),
+            Self::WITHDRAW => "withdraw".to_string(),
+            Self::DISPUTE => "dispute".to_string(),
+            Self::RESOLVE => "resolve".to_string(),
+            Self::CHARGEBACK => "chargeback".to_string(),
+            _ => "none".to_string(),
         }
     }
 
@@ -114,28 +112,49 @@ pub struct TxRecordSmall<'a> {
     pub tx_id: u32,
 }
 
-// #[derive(Debug, Clone, Copy)]
-// pub struct TxRow {
-//     pub type_id: u8,
-//     pub client_id: u16,
-//     pub tx_id: u32,
-//     pub amount: Decimal,
-// }
+#[derive(Debug, Clone, Copy)]
+pub struct TxRow {
+    pub type_id: TxRecordType,
+    pub client_id: u16,
+    pub tx_id: u32,
+    pub amount: Decimal,
+    pub conflict_type_id: TxRecordType,
+}
 
-// impl TxRow {
-//     pub fn new() -> Self {
-//         Self {
-//             type_id: 0,
-//             client_id: 0,
-//             tx_id: 0,
-//             amount: Decimal::new(0, 0),
-//         }
-//     }
+impl TxRow {
+    pub fn new_from_string(string: &str) -> Self {
+        let a: Vec<&str> = string.split(",").collect();
+        let conflict_type_id: TxRecordType;
+        if a.len() < 5 {
+            conflict_type_id = TxRecordType::NONE;
+        } else {
+            conflict_type_id = TxRecordType::from_binary(a[4].as_bytes());
+        }
+        let type_id = TxRecordType::from_binary(a[0].as_bytes());
+        let client_id = a[1].parse::<u16>().unwrap();
+        let tx_id = a[2].parse::<u32>().unwrap();
+        let amount = Decimal::from_str(a[3]).unwrap();
+        Self {
+            type_id,
+            client_id,
+            tx_id,
+            amount,
+            conflict_type_id,
+        }
+    }
 
-//     pub fn set(&mut self, type_id: u8, client_id: u16, tx_id: u32, amount: Decimal) {
-//         self.type_id = type_id;
-//         self.client_id = client_id;
-//         self.tx_id = tx_id;
-//         self.amount = amount;
-//     }
-// }
+    pub fn to_string(
+        tx_type: &TxRecordType,
+        client_id: &u16,
+        tx_id: &u32,
+        amount: &Decimal,
+    ) -> String {
+        format!(
+            "{},{},{},{}",
+            tx_type.to_string(),
+            client_id.to_string(),
+            tx_id.to_string(),
+            format!("{:.4}", amount)
+        )
+    }
+}
