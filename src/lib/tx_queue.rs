@@ -6,10 +6,10 @@ use std::time::Duration;
 use crate::lib::error::AppError;
 
 const PATH: &str = "model/queue";
-const MTX_NUM_TRIES: u8 = 3;
 const MTX_SLEEP_DURATION: u64 = 20;
 
 pub trait TxQueue<T: Send + Sync + 'static> {
+    fn max_queue_len() -> usize;
     fn num_threads(&self) -> u16;
     fn thread_sleep_duration() -> u64;
     fn started(&self) -> bool;
@@ -61,18 +61,48 @@ pub trait TxQueue<T: Send + Sync + 'static> {
     }
 
     fn add(&self, entry: T) -> Result<(), AppError> {
-        for _ in 1..MTX_NUM_TRIES {
+        let mut ok = false;
+        loop {
             if let Ok(mtx_q) = &mut self.mtx_q().write() {
                 let q = &mut (*mtx_q);
                 q.push(entry);
-                println!("queue length: {}", q.len());
-                return Ok(());
+                if q.len() >= Self::max_queue_len() {
+                    thread::sleep(Duration::from_millis(1000));
+                }
+                ok = true;
+                break;
             } else {
                 thread::sleep(Duration::from_millis(MTX_SLEEP_DURATION));
             }
         }
+
+        if ok {
+            return Ok(())
+        }
         let msg = "error accessing mtx_q lock";
         return Err(AppError::new(PATH, "get_queue", "00", msg));
+    }
+
+    fn add_block(&self, block: &mut Vec<T>) -> Result<(), AppError> {
+        let mut ok = false;
+        loop {
+            if let Ok(mtx_q) = &mut self.mtx_q().write() {
+                let q = &mut (*mtx_q);
+                q.append(block);
+                
+                ok = true;
+                break;
+            } else {
+                thread::sleep(Duration::from_millis(MTX_SLEEP_DURATION));
+            }
+        }
+
+        if ok {
+            return Ok(());
+        }
+
+        let msg = "error accessing mtx_q lock";
+        Err(AppError::new(PATH, "get_queue", "00", msg))
     }
 
     fn spawn_workers(&mut self) -> Result<(), AppError> {

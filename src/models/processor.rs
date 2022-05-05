@@ -1,5 +1,6 @@
 use std::fs;
 
+use super::balance_queue::{BalanceQueue, SummaryPath};
 use super::tx_cluster::{TxCluster, TxClusterData, TxClusterPath};
 use super::tx_cluster_queue::TxClusterQueue;
 use super::tx_reader::TxRecordReader;
@@ -55,7 +56,12 @@ impl<'a> Processor<'a> {
         }
 
         let result = self.summarize_transactions_by_client();
-        self.cleanup(enable_cleanup);
+        if result.is_err() {
+            self.cleanup(enable_cleanup);
+            return result;
+        }
+
+        let result = self.update_balances();
         timer.stop();
         result
     }
@@ -132,6 +138,31 @@ impl<'a> Processor<'a> {
         }
 
         let mut q = TxSummaryQueue::new(&self.csv_summary_dir, cluster_paths, num_summary_threads);
+        q.start()?;
+        q.stop()?;
+        Ok(())
+    }
+
+    fn update_balances(&self) -> Result<(), AppError> {
+        println!("booyah!");
+        let summary_files = SummaryPath::paths(true, &self.csv_summary_dir)?;
+        let mut account_files = SummaryPath::paths(false, ACCOUNT_DIR)?;
+
+        println!("{:?}", summary_files);
+        println!("{:?}", account_files);
+
+        let num_threads: u16;
+        if summary_files.len() + account_files.len() > u16::MAX as usize {
+            num_threads = MAX_SUMMARY_THREADS;
+        } else {
+            num_threads = ((summary_files.len() as u16) / 1000) + MIN_SUMMARY_THREADS;
+        }
+
+        let mut q = BalanceQueue::new(summary_files, num_threads);
+        q.start()?;
+        q.stop()?;
+
+        let _ = q.add_block(&mut account_files);
         q.start()?;
         q.stop()?;
         Ok(())

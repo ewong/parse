@@ -1,4 +1,5 @@
 pub mod account;
+pub mod balance_queue;
 pub mod processor;
 pub mod tx_cluster;
 pub mod tx_cluster_queue;

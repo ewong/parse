@@ -93,8 +93,8 @@ fn process_dispute_base_test() {
     assert_eq!(account.total, Decimal::new(2, 0));
     assert!(!account.locked);
 
-    TestHelper::remove_dir(&cluster_base);
-    TestHelper::remove_dir(&summary_base);
+    // TestHelper::remove_dir(&cluster_base);
+    // TestHelper::remove_dir(&summary_base);
 }
 
 #[test]
@@ -169,8 +169,8 @@ fn process_dispute_tx_dne_test() {
     assert_eq!(account.total, Decimal::new(14, 0));
     assert!(!account.locked);
 
-    TestHelper::remove_dir(&cluster_base);
-    TestHelper::remove_dir(&summary_base);
+    // TestHelper::remove_dir(&cluster_base);
+    // TestHelper::remove_dir(&summary_base);
 }
 
 /*

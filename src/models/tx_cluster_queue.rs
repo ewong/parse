@@ -37,6 +37,10 @@ impl<T> TxQueue<T> for TxClusterQueue<T>
 where
     T: TxClusterData,
 {
+    fn max_queue_len() -> usize {
+        5
+    }
+
     fn num_threads(&self) -> u16 {
         self.num_threads
     }

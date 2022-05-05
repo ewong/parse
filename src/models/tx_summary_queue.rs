@@ -98,6 +98,10 @@ impl<T> TxQueue<T> for TxSummaryQueue<T>
 where
     T: TxClusterPathData,
 {
+    fn max_queue_len() -> usize {
+        64000
+    }
+
     fn num_threads(&self) -> u16 {
         self.num_threads
     }

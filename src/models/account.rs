@@ -194,7 +194,6 @@ impl Account {
 
     pub fn write_to_csv(&mut self, account_dir: &str) -> Result<(), AppError> {
         let file_path = [account_dir, "/", &self.client_id.to_string(), ".csv"].join("");
-
         let mut writer = csv::Writer::from_path(&file_path)
             .map_err(|e| AppError::new(PATH, FN_WRITE_CSV, "01", &e.to_string()))?;
 
