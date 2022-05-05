@@ -1,33 +1,31 @@
+use chrono::Utc;
 use crossbeam_channel::{bounded, select, unbounded, Receiver, Sender};
 use std::collections::HashMap;
-use std::thread;
+use std::path::Path;
 use std::time::Duration;
+use std::{fs, thread};
 
-use super::account::Account;
-use super::tx_cluster::TxCluster;
-use super::tx_history::TxHistory;
-use super::tx_record::TxRow;
+use super::account::{Account, AccountPath};
+use crate::lib::constants::{ACCOUNT_BACKUP_DIR, ACCOUNT_DIR};
 use crate::lib::error::AppError;
 
-const MAX_NUM_RECORDS: usize = 10;
+const MAX_NUM_RECORDS: usize = 64_000;
 const THREAD_SLEEP_DURATION: u64 = 250;
 
-const PATH: &str = "model/balancer";
+const PATH: &str = "model/updater";
 
-pub struct Balancer {
+pub struct Updater {
     started: bool,
-    summary_dir: String,
-    tx: Sender<Option<TxCluster>>,
+    tx: Sender<Option<Vec<AccountPath>>>,
     rx: Receiver<Result<(), AppError>>,
 }
 
-impl Balancer {
-    pub fn new(summary_dir: &str) -> Self {
+impl Updater {
+    pub fn new() -> Self {
         let (tx, _) = bounded(0);
         let (_, rx) = bounded(0);
         Self {
             started: false,
-            summary_dir: summary_dir.to_string(),
             tx,
             rx,
         }
@@ -41,9 +39,9 @@ impl Balancer {
         Ok(())
     }
 
-    pub fn add(&self, tx_cluster: TxCluster) -> Result<(), AppError> {
+    pub fn add(&self, account_paths: Vec<AccountPath>) -> Result<(), AppError> {
         self.tx
-            .send(Some(tx_cluster))
+            .send(Some(account_paths))
             .map_err(|e| AppError::new(PATH, "add", "00", &e.to_string()))?;
         loop {
             if self.tx.len() >= MAX_NUM_RECORDS {
@@ -80,7 +78,7 @@ impl Balancer {
         self.tx = parent_tx;
         self.rx = parent_rx;
 
-        let mut manager = LoadManager::new(&self.summary_dir, child_tx, child_rx);
+        let mut manager = LoadManager::new(child_tx, child_rx);
         thread::spawn(move || {
             for _ in 0..63 {
                 manager.spawn_worker();
@@ -95,28 +93,20 @@ impl Balancer {
 
 struct LoadManager {
     tx: Sender<Result<(), AppError>>,
-    rx: Receiver<Option<TxCluster>>,
-    summary_dir: String,
+    rx: Receiver<Option<Vec<AccountPath>>>,
     num_workers: u16,
     worker_id_ptr: u16,
-    worker_map: HashMap<u16, u16>,
-    worker_tx_channels: Vec<Sender<Option<(u16, Vec<TxRow>)>>>,
+    worker_tx_channels: Vec<Sender<Option<Vec<AccountPath>>>>,
     worker_rx_channels: Vec<Receiver<Result<u16, AppError>>>,
 }
 
 impl LoadManager {
-    fn new(
-        summary_dir: &str,
-        tx: Sender<Result<(), AppError>>,
-        rx: Receiver<Option<TxCluster>>,
-    ) -> Self {
+    fn new(tx: Sender<Result<(), AppError>>, rx: Receiver<Option<Vec<AccountPath>>>) -> Self {
         Self {
             tx,
             rx,
-            summary_dir: summary_dir.to_string(),
             num_workers: 0,
             worker_id_ptr: 0,
-            worker_map: HashMap::new(),
             worker_tx_channels: Vec::new(),
             worker_rx_channels: Vec::new(),
         }
@@ -127,24 +117,15 @@ impl LoadManager {
             select! {
                 recv(self.rx) -> packet => {
                     if let Ok(block) = packet {
-                        if let Some(tx_cluster) = block {
-                            for (client_id, tx_rows) in tx_cluster.tx_row_map {
-                                if self.worker_map.contains_key(&client_id) {
-                                    let worker_id = self.worker_map.get(&client_id).unwrap().clone();
-                                    let tx = self.worker_tx_channels.get(worker_id as usize).unwrap();
-                                    tx.send(Some((client_id, tx_rows))).unwrap();
-                                } else {
-                                    let worker_id_ptr = self.worker_id_ptr.clone();
-                                    let tx = self.worker_tx_channels.get(worker_id_ptr as usize).unwrap();
-                                    tx.send(Some((client_id, tx_rows))).unwrap();
+                        if let Some(account_paths) = block {
+                            let worker_id_ptr = self.worker_id_ptr.clone();
+                            let tx = self.worker_tx_channels.get(worker_id_ptr as usize).unwrap();
+                            tx.send(Some(account_paths)).unwrap();
 
-                                    self.worker_map.insert(client_id.clone(),worker_id_ptr.clone());
-                                    if (self.worker_id_ptr as usize) == self.worker_tx_channels.len() - 1 {
-                                        self.worker_id_ptr = 0;
-                                    } else {
-                                        self.worker_id_ptr += 1;
-                                    }
-                                }
+                            if (self.worker_id_ptr as usize) == self.worker_tx_channels.len() - 1 {
+                                self.worker_id_ptr = 0;
+                            } else {
+                                self.worker_id_ptr += 1;
                             }
                         } else {
                             self.shutdown();
@@ -178,7 +159,7 @@ impl LoadManager {
         let wid = self.num_workers;
         let tx = worker_tx.clone();
         let rx = worker_rx.clone();
-        let mut worker = Worker::new(wid, &self.summary_dir, tx, rx);
+        let mut worker = Worker::new(wid, tx, rx);
         thread::spawn(move || worker.listen());
         println!("spawned worker {}", wid);
         self.num_workers += 1;
@@ -187,22 +168,19 @@ impl LoadManager {
 
 struct Worker {
     id: u16,
-    summary_dir: String,
     account_map: HashMap<u16, Account>,
     tx: Sender<Result<u16, AppError>>,
-    rx: Receiver<Option<(u16, Vec<TxRow>)>>,
+    rx: Receiver<Option<Vec<AccountPath>>>,
 }
 
 impl Worker {
     fn new(
         id: u16,
-        summary_dir: &str,
         tx: Sender<Result<u16, AppError>>,
-        rx: Receiver<Option<(u16, Vec<TxRow>)>>,
+        rx: Receiver<Option<Vec<AccountPath>>>,
     ) -> Self {
         Self {
             id,
-            summary_dir: summary_dir.to_string(),
             tx,
             rx,
             account_map: HashMap::new(),
@@ -214,25 +192,43 @@ impl Worker {
             select! {
                 recv(self.rx) -> packet => {
                     if let Ok(block) = packet {
-                        if let Some(tuple) = block {
-                            //println!("worker {} got client id: {}, num row: {}", self.id, tuple.0, tuple.1.len());
-                            let client_id = tuple.0;
-                            let tx_rows = tuple.1;
-                            let mut account: Account;
-                            if self.account_map.contains_key(&client_id) {
-                                account = self.account_map.get(&client_id).unwrap().clone();
-                            } else {
-                                account = Account::new_for_balancer(client_id, &self.summary_dir);
+                        if let Some(account_paths) = block {
+                            for entry in account_paths {
+
+                            if entry.update_file {
+                                let account_file = [ACCOUNT_DIR, &entry.file_name].join("/");
+                                if Path::new(&account_file).exists() {
+                                    let backup_file = [
+                                        ACCOUNT_BACKUP_DIR,
+                                        "/",
+                                        &entry.file_name.replace(
+                                            ".csv",
+                                            &["_", &Utc::now().timestamp_millis().to_string(), ".csv"].join(""),
+                                        ),
+                                    ]
+                                    .join("");
+                                    let _ = fs::copy(&account_file, backup_file);
+                                    let _ = fs::remove_file(&account_file);
+                                }
+
+                                let _ = fs::copy(&entry.file_path, &account_file);
+                                let _ = fs::remove_file(&entry.file_path);
+                                continue;
                             }
-                            let mut tx_history = TxHistory::new(&client_id);
-                            for row in &tx_rows {
-                                account.handle_tx(&row.type_id, &row.tx_id, &row.amount, &mut tx_history);
+
+                            let result = fs::read_to_string(&entry.file_path).map_err(|e| {
+                                AppError::new(
+                                    PATH,
+                                    "process_entry",
+                                    &["00", &entry.file_path].join(" | "),
+                                    &e.to_string(),
+                                )
+                            });
+
+                            if result.is_ok() {
+                                println!("{}", result.unwrap().replace("\n", ""));
                             }
-                            let result = account.write_to_csv(&self.summary_dir);
-                            if result.is_err() {
-                                self.tx.send(Err(result.err().unwrap())).unwrap();
-                                self.shutdown();
-                                break;
+
                             }
                         } else {
                             self.shutdown();

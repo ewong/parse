@@ -9,3 +9,4 @@ pub mod tx_reader;
 pub mod tx_record;
 pub mod tx_summary_queue;
 pub mod tx_writer;
+pub mod updater;

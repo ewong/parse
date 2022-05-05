@@ -1,14 +1,17 @@
 use std::fs;
 
+use super::account::AccountPath;
 use super::balance_queue::{BalanceQueue, SummaryPath};
 use super::balancer::Balancer;
 use super::tx_cluster::{TxCluster, TxClusterData, TxClusterPath};
 use super::tx_cluster_queue::TxClusterQueue;
 use super::tx_reader::TxReader;
-use super::tx_record::{TxRecordType, TxRow};
+use super::tx_record::TxRow;
 use super::tx_summary_queue::TxSummaryQueue;
+use super::updater::Updater;
 use crate::lib::constants::{ACCOUNT_DIR, CLUSTER_DIR, FN_NEW, SUMMARY_DIR, TRANSACTION_DIR};
 use crate::lib::error::AppError;
+use crate::lib::timer::Timer;
 use crate::lib::tx_queue::TxQueue;
 
 const PATH: &str = "model/processor";
@@ -47,7 +50,27 @@ impl<'a> Processor<'a> {
         })
     }
 
-    pub fn process_transactions(&self, enable_cleanup: bool) -> Result<(), AppError> {
+    pub fn process_data(&self, enable_cleanup: bool) -> Result<(), AppError> {
+        let timer = Timer::start();
+
+        let result = self.cluster_transactions();
+        if result.is_err() {
+            self.cleanup(enable_cleanup);
+            return result;
+        }
+
+        let result = self.update_accounts();
+        if result.is_err() {
+            self.cleanup(enable_cleanup);
+            return result;
+        }
+
+        let result = self.update_balances();
+        timer.stop();
+        result
+    }
+
+    pub fn cluster_transactions(&self) -> Result<(), AppError> {
         let mut tx_cluster = TxCluster::new(0);
         let mut tx_reader = TxReader::new(&self.source_csv_path)?;
         let mut balancer = Balancer::new(&self.csv_summary_dir);
@@ -112,6 +135,24 @@ impl<'a> Processor<'a> {
         }
 
         balancer.stop()?;
+        Ok(())
+    }
+
+    fn update_accounts(&self) -> Result<(), AppError> {
+        let mut updater = Updater::new();
+        let mut batches = AccountPath::paths(true, &self.csv_summary_dir)?;
+        updater.start()?;
+        for files in batches {
+            updater.add(files)?;
+        }
+        updater.stop()?;
+
+        batches = AccountPath::paths(false, ACCOUNT_DIR)?;
+        for files in batches {
+            updater.add(files)?;
+        }
+        updater.stop()?;
+
         Ok(())
     }
 

@@ -20,9 +20,9 @@ pub trait SummaryPathData: Send + Sync + 'static {
 
 #[derive(Debug)]
 pub struct SummaryPath {
-    update_file: bool,
-    file_path: String,
-    file_name: String,
+    pub update_file: bool,
+    pub file_path: String,
+    pub file_name: String,
 }
 
 impl SummaryPath {

@@ -1,3 +1,5 @@
+use std::fs;
+
 use csv::ByteRecord;
 use rust_decimal::prelude::*;
 use serde::{Deserialize, Serialize};
@@ -9,8 +11,7 @@ use super::tx_writer::TxWriter;
 use crate::lib::constants::ACCOUNT_DIR;
 use crate::lib::error::AppError;
 
-// const PATH: &str = "model/account";
-// const FN_WRITE_CSV: &str = "write_csv";
+const PATH: &str = "model/account";
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct Account {
@@ -221,5 +222,68 @@ impl Account {
         let mut tx_writer = TxWriter::new(summary_dir, &self.client_id.to_string())?;
         tx_writer.write_records(&vec![byte_record])?;
         Ok(())
+    }
+}
+
+#[derive(Debug)]
+pub struct AccountPath {
+    pub update_file: bool,
+    pub file_path: String,
+    pub file_name: String,
+}
+
+impl AccountPath {
+    pub fn new() -> Self {
+        Self {
+            update_file: true,
+            file_path: "".to_string(),
+            file_name: "".to_string(),
+        }
+    }
+
+    pub fn paths(update_file: bool, dir: &str) -> Result<Vec<Vec<AccountPath>>, AppError> {
+        let mut row = 0;
+        let mut block = 0;
+        let mut paths: Vec<Vec<AccountPath>> = Vec::new();
+
+        let p =
+            fs::read_dir(dir).map_err(|e| AppError::new(PATH, "paths", "00", &e.to_string()))?;
+
+        let mut v = Vec::new();
+        for e in p {
+            if e.is_err() {
+                continue;
+            }
+
+            let path = e.unwrap();
+            if path.path().is_dir() {
+                continue;
+            }
+
+            let file_path = path.path().display().to_string();
+            let file_name = path
+                .path()
+                .file_name()
+                .unwrap()
+                .to_str()
+                .unwrap()
+                .to_string();
+
+            v.push(AccountPath {
+                update_file,
+                file_path,
+                file_name,
+            });
+
+            row += 1;
+            if row == 1000 {
+                row = 0;
+                block += 1;
+                paths.push(v);
+                v = Vec::new();
+            }
+        }
+
+        Ok(paths)
     }
 }

@@ -17,22 +17,8 @@ impl TxWriter {
         Ok(Self { writer })
     }
 
-    pub fn new_writer(dir_path: &str, file_name: &str) -> Result<Writer<File>, AppError> {
-        let file_path = Self::file_path(dir_path, file_name)?;
-        let writer = csv::WriterBuilder::new()
-            .has_headers(false)
-            .flexible(true)
-            .from_path(&file_path)
-            .map_err(|e| AppError::new(PATH, FN_NEW, "00", &e.to_string()))?;
-        Ok(writer)
-    }
-
     pub fn set_writer(&mut self, dir_path: &str, file_name: &str) -> Result<(), AppError> {
-        let file_path = Self::file_path(dir_path, file_name)?;
-        self.writer = csv::WriterBuilder::new()
-            .flexible(true)
-            .from_path(&file_path)
-            .map_err(|e| AppError::new(PATH, FN_NEW, "01", &e.to_string()))?;
+        self.writer = Self::new_writer(dir_path, file_name)?;
         Ok(())
     }
 
@@ -54,5 +40,15 @@ impl TxWriter {
         fs::create_dir_all(dir_path)
             .map_err(|e| AppError::new(PATH, "file_path", "00", &e.to_string()))?;
         Ok([dir_path, "/", file_name, ".csv"].join(""))
+    }
+
+    fn new_writer(dir_path: &str, file_name: &str) -> Result<Writer<File>, AppError> {
+        let file_path = Self::file_path(dir_path, file_name)?;
+        let writer = csv::WriterBuilder::new()
+            .has_headers(false)
+            .flexible(true)
+            .from_path(&file_path)
+            .map_err(|e| AppError::new(PATH, FN_NEW, "00", &e.to_string()))?;
+        Ok(writer)
     }
 }
