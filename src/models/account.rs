@@ -6,6 +6,7 @@ use super::tx_history::TxHistory;
 use super::tx_reader::TxReader;
 use super::tx_record::TxRecordType;
 use super::tx_writer::TxWriter;
+use crate::lib::constants::ACCOUNT_DIR;
 use crate::lib::error::AppError;
 
 // const PATH: &str = "model/account";
@@ -24,6 +25,25 @@ pub struct Account {
 impl Account {
     pub fn new(client_id: u16, account_dir: &str) -> Self {
         let user_opt = Self::load_from_file(client_id, account_dir);
+
+        if user_opt.is_none() {
+            return Self {
+                client_id,
+                available: Decimal::new(0, 0),
+                held: Decimal::new(0, 0),
+                total: Decimal::new(0, 0),
+                locked: false,
+            };
+        }
+        user_opt.unwrap()
+    }
+
+    pub fn new_for_balancer(client_id: u16, summary_dir: &str) -> Self {
+        let mut user_opt = Self::load_from_file(client_id, summary_dir);
+
+        if user_opt.is_none() {
+            user_opt = Self::load_from_file(client_id, ACCOUNT_DIR);
+        }
 
         if user_opt.is_none() {
             return Self {
@@ -183,7 +203,7 @@ impl Account {
         }
     }
 
-    pub fn write_to_csv(&self, account_dir: &str) -> Result<(), AppError> {
+    pub fn write_to_csv(&self, summary_dir: &str) -> Result<(), AppError> {
         let available_str = format!("{:.4}", self.available);
         let held_str = format!("{:.4}", self.held);
         let total_str = format!("{:.4}", self.total);
@@ -198,7 +218,7 @@ impl Account {
             ][..],
         );
 
-        let mut tx_writer = TxWriter::new(account_dir, &self.client_id.to_string())?;
+        let mut tx_writer = TxWriter::new(summary_dir, &self.client_id.to_string())?;
         tx_writer.write_records(&vec![byte_record])?;
         Ok(())
     }

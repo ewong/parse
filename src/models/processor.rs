@@ -1,9 +1,11 @@
 use std::fs;
 
 use super::balance_queue::{BalanceQueue, SummaryPath};
+use super::balancer::Balancer;
 use super::tx_cluster::{TxCluster, TxClusterData, TxClusterPath};
 use super::tx_cluster_queue::TxClusterQueue;
 use super::tx_reader::TxReader;
+use super::tx_record::{TxRecordType, TxRow};
 use super::tx_summary_queue::TxSummaryQueue;
 use crate::lib::constants::{ACCOUNT_DIR, CLUSTER_DIR, FN_NEW, SUMMARY_DIR, TRANSACTION_DIR};
 use crate::lib::error::AppError;
@@ -45,6 +47,74 @@ impl<'a> Processor<'a> {
         })
     }
 
+    pub fn process_transactions(&self, enable_cleanup: bool) -> Result<(), AppError> {
+        let mut tx_cluster = TxCluster::new(0);
+        let mut tx_reader = TxReader::new(&self.source_csv_path)?;
+        let mut balancer = Balancer::new(&self.csv_summary_dir);
+
+        balancer.start()?;
+        let mut block: usize = 0;
+        let mut rows: usize = 0;
+
+        while tx_reader.next_record() {
+            let tx_id = tx_reader.tx_record_type().clone();
+            let tx_row = TxRow::new(
+                tx_id,
+                tx_reader.tx_record_client().clone(),
+                tx_reader.tx_record_tx().clone(),
+                tx_reader.tx_record_amount().clone(),
+            );
+            tx_cluster.add(tx_row);
+
+            rows += 1;
+            if rows == BLOCK_SIZE {
+                if block == 0 {
+                    println!("----------------------------------------------------");
+                }
+
+                println!(
+                    "add to q --> block: {}, num clients: {}",
+                    block,
+                    tx_cluster.tx_map().len()
+                );
+
+                rows = 0;
+                block += 1;
+                balancer.add(tx_cluster)?;
+                tx_cluster = TxCluster::new(block);
+                println!("----------------------------------------------------");
+            }
+        }
+
+        // handle rollback
+        if let Some(error) = tx_reader.error() {
+            let _ = balancer.stop();
+            return Err(AppError::new(
+                PATH,
+                "cluster_transactions_by_client",
+                "00",
+                error,
+            ));
+        }
+
+        // send remaining data to write queue
+        if tx_cluster.tx_map().len() > 0 {
+            if block > 0 {
+                block += 1;
+            }
+
+            println!(
+                "send remaining data to write queue --> block: {}, num clients: {}",
+                block,
+                tx_cluster.tx_map().len()
+            );
+            balancer.add(tx_cluster)?;
+        }
+
+        balancer.stop()?;
+        Ok(())
+    }
+
     pub fn process_csv(&self, enable_cleanup: bool) -> Result<(), AppError> {
         // let timer = Timer::start();
 
@@ -75,7 +145,7 @@ impl<'a> Processor<'a> {
         let mut rows: usize = 0;
 
         while tx_reader.next_record() {
-            tx_cluster.add(tx_reader.tx_record_client(), tx_reader.byte_record());
+            tx_cluster.add_tx(tx_reader.tx_record_client(), tx_reader.byte_record());
 
             rows += 1;
             if rows == BLOCK_SIZE {

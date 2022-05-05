@@ -146,6 +146,16 @@ pub struct TxRow {
 }
 
 impl TxRow {
+    pub fn new(type_id: TxRecordType, client_id: u16, tx_id: u32, amount: Decimal) -> Self {
+        Self {
+            type_id,
+            client_id,
+            tx_id,
+            amount,
+            conflict_type_id: TxRecordType::NONE,
+        }
+    }
+
     pub fn new_from_string(string: &str) -> Self {
         let a: Vec<&str> = string.split(",").collect();
         let conflict_type_id: TxRecordType;

@@ -22,7 +22,8 @@ fn main() {
     }
 
     let p = result.unwrap();
-    if let Err(err) = p.process_csv(false) {
+    // if let Err(err) = p.process_csv(false) {
+    if let Err(err) = p.process_transactions(false) {
         err.show();
     }
 }

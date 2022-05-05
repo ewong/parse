@@ -4,16 +4,20 @@ use std::fs;
 
 use crate::lib::error::AppError;
 
+use super::tx_record::TxRow;
+
 const PATH: &str = "model/tx_cluster";
 
 pub trait TxClusterData: Send + Sync + 'static {
     fn block(&self) -> usize;
     fn tx_map(&self) -> &HashMap<u16, Vec<ByteRecord>>;
+    fn tx_row_map(&self) -> &HashMap<u16, Vec<TxRow>>;
 }
 
 pub struct TxCluster {
     block: usize,
-    tx_map: HashMap<u16, Vec<ByteRecord>>,
+    pub tx_map: HashMap<u16, Vec<ByteRecord>>,
+    pub tx_row_map: HashMap<u16, Vec<TxRow>>,
 }
 
 impl TxCluster {
@@ -21,10 +25,11 @@ impl TxCluster {
         Self {
             block,
             tx_map: HashMap::new(),
+            tx_row_map: HashMap::new(),
         }
     }
 
-    pub fn add(&mut self, client_id: &u16, byte_record: &ByteRecord) {
+    pub fn add_tx(&mut self, client_id: &u16, byte_record: &ByteRecord) {
         if self.tx_map.contains_key(client_id) {
             self.tx_map.entry(client_id.clone()).and_modify(|e| {
                 e.push(byte_record.clone());
@@ -33,6 +38,21 @@ impl TxCluster {
             let mut v = Vec::new();
             v.push(byte_record.clone());
             self.tx_map.insert(client_id.clone(), v);
+        }
+    }
+
+    pub fn add(&mut self, tx_row: TxRow) {
+        if self.tx_row_map.contains_key(&tx_row.client_id) {
+            self.tx_row_map
+                .entry(tx_row.client_id.clone())
+                .and_modify(|e| {
+                    e.push(tx_row);
+                });
+        } else {
+            let client_id = tx_row.client_id.clone();
+            let mut v = Vec::new();
+            v.push(tx_row);
+            self.tx_row_map.insert(client_id, v);
         }
     }
 }
@@ -44,6 +64,10 @@ impl TxClusterData for TxCluster {
 
     fn tx_map(&self) -> &HashMap<u16, Vec<ByteRecord>> {
         &self.tx_map
+    }
+
+    fn tx_row_map(&self) -> &HashMap<u16, Vec<TxRow>> {
+        &self.tx_row_map
     }
 }
 
