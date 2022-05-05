@@ -1,7 +1,7 @@
 use rust_decimal::Decimal;
 
 use super::helpers::helper::TestHelper;
-use crate::lib::constants::{CLUSTER_DIR, SUMMARY_DIR};
+use crate::lib::constants::{CLUSTER_DIR, ACCOUNT_DIR, SUMMARY_DIR};
 use crate::models::account::Account;
 use crate::models::processor::Processor;
 use crate::models::tx_reader::TxRecordReader;
@@ -32,6 +32,10 @@ fn process_dispute_base_test() {
 
     let p = result.unwrap();
     let result = p.process_csv(false);
+    if result.is_err() {
+        result.err().unwrap().show();
+        return;
+    }
     assert!(result.is_ok());
 
     // check output files
@@ -84,9 +88,7 @@ fn process_dispute_base_test() {
     assert_eq!(reader.tx_record_amount(), &Decimal::new(0, 0));
 
     // check balance
-    let summary_base = [SUMMARY_DIR, "dispute_base"].join("/");
-
-    let account = Account::new(5, &summary_base);
+    let account = Account::new(5, ACCOUNT_DIR);
     assert_eq!(account.client_id, 5);
     assert_eq!(account.available, Decimal::new(1, 0));
     assert_eq!(account.held, Decimal::new(1, 0));
@@ -94,7 +96,8 @@ fn process_dispute_base_test() {
     assert!(!account.locked);
 
     TestHelper::remove_dir(&cluster_base);
-    TestHelper::remove_dir(&summary_base);
+    TestHelper::remove_dir(&[SUMMARY_DIR, "5"].join("/"));
+    TestHelper::remove_file(&[ACCOUNT_DIR, "5.csv"].join("/"));
 }
 
 #[test]
@@ -160,17 +163,17 @@ fn process_dispute_tx_dne_test() {
     assert_eq!(reader.tx_record_amount(), &Decimal::new(0, 0));
 
     // check balance
-    let summary_base = [SUMMARY_DIR, "dispute_tx_dne"].join("/");
-
-    let account = Account::new(6, &summary_base);
+    let account = Account::new(6, ACCOUNT_DIR);
     assert_eq!(account.client_id, 6);
     assert_eq!(account.available, Decimal::new(14, 0));
     assert_eq!(account.held, Decimal::new(0, 0));
     assert_eq!(account.total, Decimal::new(14, 0));
     assert!(!account.locked);
 
+    
     TestHelper::remove_dir(&cluster_base);
-    TestHelper::remove_dir(&summary_base);
+    TestHelper::remove_dir(&[SUMMARY_DIR, "6"].join("/"));
+    TestHelper::remove_file(&[ACCOUNT_DIR, "6.csv"].join("/"));
 }
 
 /*

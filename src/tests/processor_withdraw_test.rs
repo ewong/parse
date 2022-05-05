@@ -1,7 +1,7 @@
 use rust_decimal::Decimal;
 
 use super::helpers::helper::TestHelper;
-use crate::lib::constants::{CLUSTER_DIR, SUMMARY_DIR};
+use crate::lib::constants::{CLUSTER_DIR, ACCOUNT_DIR, SUMMARY_DIR};
 use crate::models::account::Account;
 use crate::models::processor::Processor;
 use crate::models::tx_reader::TxRecordReader;
@@ -94,9 +94,7 @@ fn process_withdraw_test() {
     assert_eq!(reader.tx_record_amount(), &Decimal::new(5, 0));
 
     // check balance
-    let summary_base = [SUMMARY_DIR, "withdraw"].join("/");
-
-    let account = Account::new(7, &summary_base);
+    let account = Account::new(7, ACCOUNT_DIR);
     assert_eq!(account.client_id, 7);
     assert_eq!(account.available, Decimal::new(9, 0));
     assert_eq!(account.held, Decimal::new(0, 0));
@@ -104,5 +102,6 @@ fn process_withdraw_test() {
     assert!(!account.locked);
 
     TestHelper::remove_dir(&cluster_base);
-    TestHelper::remove_dir(&summary_base);
+    TestHelper::remove_dir(&[SUMMARY_DIR, "7"].join("/"));
+    TestHelper::remove_file(&[ACCOUNT_DIR, "7.csv"].join("/"));
 }

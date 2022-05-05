@@ -34,6 +34,24 @@ impl SummaryPath {
         }
     }
 
+    pub fn count(dir: &str) -> Result<usize, AppError> {
+        let p =
+            fs::read_dir(dir).map_err(|e| AppError::new(PATH, "count", "00", &e.to_string()))?;
+        let mut count = 0;
+
+        for e in p {
+            if e.is_err() {
+                continue;
+            }
+            let path = e.unwrap();
+            if path.path().is_dir() {
+                continue;
+            }
+            count += 1;
+        }
+        Ok(count)
+    }
+
     pub fn paths(update_file: bool, dir: &str) -> Result<Vec<SummaryPath>, AppError> {
         let p =
             fs::read_dir(dir).map_err(|e| AppError::new(PATH, "paths", "00", &e.to_string()))?;
@@ -156,6 +174,7 @@ where
 
     fn process_entry(_out_dir: &str, entry: &T) -> Result<(), AppError> {
         if entry.update_file() {
+            println!("moving {}", entry.file_path());
             let account_file = [ACCOUNT_DIR, entry.file_name()].join("/");
             if Path::new(&account_file).exists() {
                 let backup_file = [
@@ -171,14 +190,24 @@ where
                 let _ = fs::remove_file(&account_file);
             }
 
-            let _ = fs::copy(&entry.file_path(), account_file);
-            let _ = fs::remove_file(&entry.file_path());
+            let _ = fs::copy(entry.file_path(), account_file);
+            let _ = fs::remove_file(entry.file_path());
             return Ok(());
         }
 
-        let data = fs::read_to_string(&entry.file_path())
-            .map_err(|e| AppError::new(PATH, "process_entry", "00", &e.to_string()))?;
-        println!("{}", data.replace("client,available,held,total,locked", "").replace("\n", ""));
+        let data = fs::read_to_string(entry.file_path()).map_err(|e| {
+            AppError::new(
+                PATH,
+                "process_entry",
+                &["00", entry.file_path()].join(" | "),
+                &e.to_string(),
+            )
+        })?;
+        println!(
+            "{}",
+            data.replace("client,available,held,total,locked", "")
+                .replace("\n", "")
+        );
         Ok(())
     }
 }

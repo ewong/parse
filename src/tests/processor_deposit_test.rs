@@ -1,7 +1,7 @@
 use rust_decimal::Decimal;
 
 use super::helpers::helper::TestHelper;
-use crate::lib::constants::{CLUSTER_DIR, SUMMARY_DIR};
+use crate::lib::constants::{ACCOUNT_DIR, CLUSTER_DIR, SUMMARY_DIR};
 use crate::models::account::Account;
 use crate::models::processor::Processor;
 use crate::models::tx_reader::TxRecordReader;
@@ -55,9 +55,7 @@ fn process_deposit_test() {
     assert_eq!(reader.tx_record_amount(), &Decimal::new(2, 0));
 
     // check balance
-    let summary_base = [SUMMARY_DIR, "deposit"].join("/");
-
-    let mut account = Account::new(1, &summary_base);
+    let mut account = Account::new(1, ACCOUNT_DIR);
     assert_eq!(account.client_id, 1);
     assert_eq!(account.available, Decimal::new(3, 0));
     assert_eq!(account.held, Decimal::new(0, 0));
@@ -86,7 +84,7 @@ fn process_deposit_test() {
     assert_eq!(reader.tx_record_tx(), &6);
     assert_eq!(reader.tx_record_amount(), &Decimal::new(2, 0));
 
-    account = Account::new(2, &summary_base);
+    account = Account::new(2, ACCOUNT_DIR);
     assert_eq!(account.client_id, 2);
     assert_eq!(account.available, Decimal::new(3, 0));
     assert_eq!(account.held, Decimal::new(0, 0));
@@ -115,7 +113,7 @@ fn process_deposit_test() {
     assert_eq!(reader.tx_record_tx(), &7);
     assert_eq!(reader.tx_record_amount(), &Decimal::new(2, 0));
 
-    account = Account::new(3, &summary_base);
+    account = Account::new(3, ACCOUNT_DIR);
     assert_eq!(account.client_id, 3);
     assert_eq!(account.available, Decimal::new(3, 0));
     assert_eq!(account.held, Decimal::new(0, 0));
@@ -144,7 +142,7 @@ fn process_deposit_test() {
     assert_eq!(reader.tx_record_tx(), &5);
     assert_eq!(reader.tx_record_amount(), &Decimal::new(2, 0));
 
-    account = Account::new(4, &summary_base);
+    account = Account::new(4, ACCOUNT_DIR);
     assert_eq!(account.client_id, 4);
     assert_eq!(account.available, Decimal::new(3, 0));
     assert_eq!(account.held, Decimal::new(0, 0));
@@ -152,5 +150,12 @@ fn process_deposit_test() {
     assert!(!account.locked);
 
     TestHelper::remove_dir(&cluster_base);
-    TestHelper::remove_dir(&summary_base);
+    TestHelper::remove_dir(&[SUMMARY_DIR, "1"].join("/"));
+    TestHelper::remove_dir(&[SUMMARY_DIR, "2"].join("/"));
+    TestHelper::remove_dir(&[SUMMARY_DIR, "3"].join("/"));
+    TestHelper::remove_dir(&[SUMMARY_DIR, "4"].join("/"));
+    TestHelper::remove_file(&[ACCOUNT_DIR, "1.csv"].join("/"));
+    TestHelper::remove_file(&[ACCOUNT_DIR, "2.csv"].join("/"));
+    TestHelper::remove_file(&[ACCOUNT_DIR, "3.csv"].join("/"));
+    TestHelper::remove_file(&[ACCOUNT_DIR, "4.csv"].join("/"));
 }
