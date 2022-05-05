@@ -174,7 +174,6 @@ where
 
     fn process_entry(_out_dir: &str, entry: &T) -> Result<(), AppError> {
         if entry.update_file() {
-            println!("moving {}", entry.file_path());
             let account_file = [ACCOUNT_DIR, entry.file_name()].join("/");
             if Path::new(&account_file).exists() {
                 let backup_file = [
@@ -203,11 +202,7 @@ where
                 &e.to_string(),
             )
         })?;
-        println!(
-            "{}",
-            data.replace("client,available,held,total,locked", "")
-                .replace("\n", "")
-        );
+        println!("{}", data.replace("\n", ""));
         Ok(())
     }
 }

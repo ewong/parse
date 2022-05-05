@@ -9,7 +9,7 @@ use crate::lib::tx_queue::TxQueue;
 use super::account::Account;
 use super::tx_cluster::TxClusterPathData;
 use super::tx_history::TxHistory;
-use super::tx_reader::TxRecordReader;
+use super::tx_reader::TxReader;
 
 const PATH: &str = "model/client_queue";
 const FN_PROCESS_ENTRY: &str = "process_entry";
@@ -151,7 +151,7 @@ where
 
         let mut tx_history = TxHistory::new(&entry.client_id());
         let mut account = Account::new(entry.client_id(), ACCOUNT_DIR);
-        let mut tx_reader = TxRecordReader::new(&file_paths.get(0).unwrap())?;
+        let mut tx_reader = TxReader::new(&file_paths.get(0).unwrap())?;
         let mut initial_loop = true;
 
         for path in file_paths {

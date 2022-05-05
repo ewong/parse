@@ -1,6 +1,9 @@
+use csv::ByteRecord;
 use rust_decimal::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::str;
+
+use crate::lib::constants::{AMOUNT_POS, CLIENT_POS, TX_POS, TYPE_POS};
 
 const B_DEPOSIT: &[u8] = b"deposit";
 const B_WITHDRAW: &[u8] = b"withdraw";
@@ -47,6 +50,27 @@ impl TxRecordType {
 
         // return none
         Self::NONE
+    }
+
+    pub fn header_type(record: &ByteRecord) -> bool {
+        if &record[TYPE_POS] == b"type"
+            || &record[CLIENT_POS] == b"client"
+            || &record[TX_POS] == b"tx"
+            || &record[AMOUNT_POS] == b"amount"
+        {
+            return true;
+        }
+
+        for i in TYPE_POS..AMOUNT_POS {
+            if let Ok(string) = str::from_utf8(&record[i]) {
+                let s = string.to_lowercase().replace(" ", "");
+                if s == "type" || s == "client" || s == "tx" || s == "amount" {
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 
     // pub fn as_binary(&self) -> &[u8] {

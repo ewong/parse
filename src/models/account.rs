@@ -1,15 +1,15 @@
 use csv::ByteRecord;
 use rust_decimal::prelude::*;
 use serde::{Deserialize, Serialize};
-use std::fs;
 
 use super::tx_history::TxHistory;
+use super::tx_reader::TxReader;
 use super::tx_record::TxRecordType;
-use crate::lib::constants::FN_NEW;
+use super::tx_writer::TxWriter;
 use crate::lib::error::AppError;
 
-const PATH: &str = "model/account";
-const FN_WRITE_CSV: &str = "write_csv";
+// const PATH: &str = "model/account";
+// const FN_WRITE_CSV: &str = "write_csv";
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct Account {
@@ -23,7 +23,7 @@ pub struct Account {
 
 impl Account {
     pub fn new(client_id: u16, account_dir: &str) -> Self {
-        let user_opt = Self::load_user_from_file(client_id, account_dir);
+        let user_opt = Self::load_from_file(client_id, account_dir);
 
         if user_opt.is_none() {
             return Self {
@@ -37,23 +37,14 @@ impl Account {
         user_opt.unwrap()
     }
 
-    fn load_user_from_file(client_id: u16, account_dir: &str) -> Option<Account> {
-        let result = fs::File::open(&[account_dir, "/", &client_id.to_string(), ".csv"].join(""));
+    fn load_from_file(client_id: u16, account_dir: &str) -> Option<Account> {
+        let file_path = &[account_dir, "/", &client_id.to_string(), ".csv"].join("");
+        let result = TxReader::new_reader(&file_path);
         if result.is_err() {
             return None;
         }
 
-        let f = result.unwrap();
-        let mut reader = csv::Reader::from_reader(f);
-        let result = reader
-            .byte_headers()
-            .map_err(|e| AppError::new(PATH, FN_NEW, "01", &e.to_string()));
-
-        if result.is_err() {
-            return None;
-        }
-
-        let headers = result.unwrap().clone();
+        let mut reader = result.unwrap();
         let mut byte_record = ByteRecord::new();
         let result = reader.read_byte_record(&mut byte_record);
         if result.is_err() {
@@ -64,7 +55,7 @@ impl Account {
             return None;
         }
 
-        let result = byte_record.deserialize::<Account>(Some(&headers));
+        let result = byte_record.deserialize::<Account>(None);
 
         if result.is_err() {
             return None;
@@ -192,19 +183,23 @@ impl Account {
         }
     }
 
-    pub fn write_to_csv(&mut self, account_dir: &str) -> Result<(), AppError> {
-        let file_path = [account_dir, "/", &self.client_id.to_string(), ".csv"].join("");
-        let mut writer = csv::Writer::from_path(&file_path)
-            .map_err(|e| AppError::new(PATH, FN_WRITE_CSV, "01", &e.to_string()))?;
+    pub fn write_to_csv(&self, account_dir: &str) -> Result<(), AppError> {
+        let available_str = format!("{:.4}", self.available);
+        let held_str = format!("{:.4}", self.held);
+        let total_str = format!("{:.4}", self.total);
 
-        writer
-            .serialize(self)
-            .map_err(|e| AppError::new(PATH, FN_WRITE_CSV, "03", &e.to_string()))?;
+        let byte_record = ByteRecord::from(
+            &[
+                &self.client_id.to_string(),
+                &available_str,
+                &held_str,
+                &total_str,
+                &self.locked.to_string(),
+            ][..],
+        );
 
-        writer
-            .flush()
-            .map_err(|e| AppError::new(PATH, FN_WRITE_CSV, "04", &e.to_string()))?;
-
+        let mut tx_writer = TxWriter::new(account_dir, &self.client_id.to_string())?;
+        tx_writer.write_records(&vec![byte_record])?;
         Ok(())
     }
 }

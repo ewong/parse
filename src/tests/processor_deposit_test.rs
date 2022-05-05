@@ -4,7 +4,7 @@ use super::helpers::helper::TestHelper;
 use crate::lib::constants::{ACCOUNT_DIR, CLUSTER_DIR, SUMMARY_DIR};
 use crate::models::account::Account;
 use crate::models::processor::Processor;
-use crate::models::tx_reader::TxRecordReader;
+use crate::models::tx_reader::TxReader;
 use crate::models::tx_record::TxRecordType;
 
 #[test]
@@ -31,7 +31,7 @@ fn process_deposit_test() {
 
     // check output files
     let cluster_base = [CLUSTER_DIR, "deposit"].join("/");
-    let result = TxRecordReader::new(&[&cluster_base, "1", "0.csv"].join("/"));
+    let result = TxReader::new(&[&cluster_base, "1", "0.csv"].join("/"));
     assert!(result.is_ok());
 
     let mut reader = result.unwrap();

@@ -3,7 +3,7 @@ use std::fs;
 use super::balance_queue::{BalanceQueue, SummaryPath};
 use super::tx_cluster::{TxCluster, TxClusterData, TxClusterPath};
 use super::tx_cluster_queue::TxClusterQueue;
-use super::tx_reader::TxRecordReader;
+use super::tx_reader::TxReader;
 use super::tx_summary_queue::TxSummaryQueue;
 use crate::lib::constants::{ACCOUNT_DIR, CLUSTER_DIR, FN_NEW, SUMMARY_DIR, TRANSACTION_DIR};
 use crate::lib::error::AppError;
@@ -67,7 +67,7 @@ impl<'a> Processor<'a> {
 
     fn cluster_transactions_by_client(&self) -> Result<(), AppError> {
         let mut tx_cluster = TxCluster::new(0);
-        let mut tx_reader = TxRecordReader::new(&self.source_csv_path)?;
+        let mut tx_reader = TxReader::new(&self.source_csv_path)?;
         let mut q = TxClusterQueue::new(&self.csv_cluster_dir, MIN_CLUSTER_THREADS);
 
         q.start()?;
@@ -102,7 +102,7 @@ impl<'a> Processor<'a> {
             let _ = q.stop();
             return Err(AppError::new(
                 PATH,
-                &["cluster_transactions_by_client", &block.to_string()].join(" | "),
+                "cluster_transactions_by_client",
                 "00",
                 error,
             ));

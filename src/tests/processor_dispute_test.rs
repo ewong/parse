@@ -1,10 +1,10 @@
 use rust_decimal::Decimal;
 
 use super::helpers::helper::TestHelper;
-use crate::lib::constants::{CLUSTER_DIR, ACCOUNT_DIR, SUMMARY_DIR};
+use crate::lib::constants::{ACCOUNT_DIR, CLUSTER_DIR, SUMMARY_DIR};
 use crate::models::account::Account;
 use crate::models::processor::Processor;
-use crate::models::tx_reader::TxRecordReader;
+use crate::models::tx_reader::TxReader;
 use crate::models::tx_record::TxRecordType;
 
 // dispute
@@ -40,7 +40,7 @@ fn process_dispute_base_test() {
 
     // check output files
     let cluster_base = [CLUSTER_DIR, "dispute_base"].join("/");
-    let result = TxRecordReader::new(&[&cluster_base, "5", "0.csv"].join("/"));
+    let result = TxReader::new(&[&cluster_base, "5", "0.csv"].join("/"));
     assert!(result.is_ok());
 
     let mut reader = result.unwrap();
@@ -118,11 +118,15 @@ fn process_dispute_tx_dne_test() {
 
     let p = result.unwrap();
     let result = p.process_csv(false);
+    if result.is_err() {
+        result.err().unwrap().show();
+        return;
+    }
     assert!(result.is_ok());
 
     // check output files
     let cluster_base = [CLUSTER_DIR, "dispute_tx_dne"].join("/");
-    let result = TxRecordReader::new(&[&cluster_base, "6", "0.csv"].join("/"));
+    let result = TxReader::new(&[&cluster_base, "6", "0.csv"].join("/"));
     assert!(result.is_ok());
 
     let mut reader = result.unwrap();
@@ -170,7 +174,6 @@ fn process_dispute_tx_dne_test() {
     assert_eq!(account.total, Decimal::new(14, 0));
     assert!(!account.locked);
 
-    
     TestHelper::remove_dir(&cluster_base);
     TestHelper::remove_dir(&[SUMMARY_DIR, "6"].join("/"));
     TestHelper::remove_file(&[ACCOUNT_DIR, "6.csv"].join("/"));
