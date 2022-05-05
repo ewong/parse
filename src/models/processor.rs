@@ -47,7 +47,7 @@ impl<'a> Processor<'a> {
     }
 
     pub fn process_csv(&self, enable_cleanup: bool) -> Result<(), AppError> {
-        let timer = Timer::start();
+        // let timer = Timer::start();
 
         let result = self.cluster_transactions_by_client();
         if result.is_err() {
@@ -62,7 +62,7 @@ impl<'a> Processor<'a> {
         }
 
         let result = self.update_balances();
-        timer.stop();
+        // timer.stop();
         result
     }
 
@@ -80,21 +80,21 @@ impl<'a> Processor<'a> {
 
             rows += 1;
             if rows == BLOCK_SIZE {
-                if block == 0 {
-                    println!("----------------------------------------------------");
-                }
+                // if block == 0 {
+                //     println!("----------------------------------------------------");
+                // }
 
-                println!(
-                    "add to q --> block: {}, num clients: {}",
-                    block,
-                    tx_cluster.tx_map().len()
-                );
+                // println!(
+                //     "add to q --> block: {}, num clients: {}",
+                //     block,
+                //     tx_cluster.tx_map().len()
+                // );
 
                 rows = 0;
                 block += 1;
                 q.add(tx_cluster)?;
                 tx_cluster = TxCluster::new(block);
-                println!("----------------------------------------------------");
+                // println!("----------------------------------------------------");
             }
         }
 
@@ -115,11 +115,11 @@ impl<'a> Processor<'a> {
                 block += 1;
             }
 
-            println!(
-                "send remaining data to write queue --> block: {}, num clients: {}",
-                block,
-                tx_cluster.tx_map().len()
-            );
+            // println!(
+            //     "send remaining data to write queue --> block: {}, num clients: {}",
+            //     block,
+            //     tx_cluster.tx_map().len()
+            // );
             q.add(tx_cluster)?;
         }
 

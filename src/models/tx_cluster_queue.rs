@@ -50,12 +50,12 @@ where
     }
 
     fn started(&self) -> bool {
-        println!("workers started: {}", self.started);
+        // println!("workers started: {}", self.started);
         self.started
     }
 
     fn set_started(&mut self, value: bool) {
-        println!("workers started: {}", value);
+        // println!("workers started: {}", value);
         self.started = value;
     }
 

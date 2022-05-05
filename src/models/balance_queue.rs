@@ -3,8 +3,6 @@ use crossbeam_channel::{Receiver, Sender};
 use std::fs;
 use std::path::Path;
 use std::sync::{Arc, RwLock};
-use std::thread::AccessError;
-use std::time::Duration;
 
 use crate::lib::constants::{ACCOUNT_BACKUP_DIR, ACCOUNT_DIR};
 use crate::lib::error::AppError;
@@ -178,12 +176,9 @@ where
             return Ok(());
         }
 
-        // otherwise, broadcast the balance
-        println!(
-            "updating balances !!!! {}, {}",
-            entry.update_file(),
-            entry.file_path()
-        );
+        let data = fs::read_to_string(&entry.file_path())
+            .map_err(|e| AppError::new(PATH, "process_entry", "00", &e.to_string()))?;
+        println!("{}", data.replace("client,available,held,total,locked", "").replace("\n", ""));
         Ok(())
     }
 }

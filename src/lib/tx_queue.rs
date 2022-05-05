@@ -47,7 +47,7 @@ pub trait TxQueue<T: Send + Sync + 'static> {
                             if wid.is_err() {
                                 err = wid.err();
                             } else {
-                                println!("worker {} is shutdown", wid.unwrap());
+                                // println!("worker {} is shutdown", wid.unwrap());
                             }
                         }
                     }
@@ -77,7 +77,7 @@ pub trait TxQueue<T: Send + Sync + 'static> {
         }
 
         if ok {
-            return Ok(())
+            return Ok(());
         }
         let msg = "error accessing mtx_q lock";
         return Err(AppError::new(PATH, "get_queue", "00", msg));
@@ -89,7 +89,9 @@ pub trait TxQueue<T: Send + Sync + 'static> {
             if let Ok(mtx_q) = &mut self.mtx_q().write() {
                 let q = &mut (*mtx_q);
                 q.append(block);
-                
+                if q.len() >= Self::max_queue_len() {
+                    thread::sleep(Duration::from_millis(1000));
+                }
                 ok = true;
                 break;
             } else {
@@ -143,7 +145,7 @@ pub trait TxQueue<T: Send + Sync + 'static> {
                     drop(mgq);
                     let result = Self::process_entry(&out_dir_path, &entry);
                     if result.is_err() {
-                        println!("worker {} failed. rolling back", wid);
+                        // println!("worker {} failed. rolling back", wid);
                         tx.send(Err(result.err().unwrap())).unwrap();
                         break;
                     }
@@ -152,7 +154,7 @@ pub trait TxQueue<T: Send + Sync + 'static> {
                 // sleep
                 thread::sleep(Duration::from_millis(Self::thread_sleep_duration()));
             });
-            println!("spawned worker {}", wid);
+            // println!("spawned worker {}", wid);
         }
 
         Ok(())

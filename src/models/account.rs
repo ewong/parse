@@ -88,10 +88,10 @@ impl Account {
                 self.available += *amount;
                 self.total += *amount;
 
-                println!(
-                    "deposit --> client {}, available: {}, held: {}, total: {}, locked: {}",
-                    self.client_id, self.available, self.held, self.total, self.locked
-                );
+                // println!(
+                //     "deposit --> client {}, available: {}, held: {}, total: {}, locked: {}",
+                //     self.client_id, self.available, self.held, self.total, self.locked
+                // );
             }
             TxRecordType::WITHDRAW => {
                 if self.locked {
@@ -100,10 +100,10 @@ impl Account {
                 if self.available >= *amount {
                     self.available -= *amount;
                     self.total -= *amount;
-                    println!(
-                        "withdraw --> client {}, available: {}, held: {}, total: {}, locked: {}",
-                        self.client_id, self.available, self.held, self.total, self.locked
-                    );
+                    // println!(
+                    //     "withdraw --> client {}, available: {}, held: {}, total: {}, locked: {}",
+                    //     self.client_id, self.available, self.held, self.total, self.locked
+                    // );
                 }
             }
             TxRecordType::DISPUTE => {
@@ -126,10 +126,10 @@ impl Account {
 
                     tx.conflict_type_id = TxRecordType::DISPUTE;
                     tx_history.set_tx(&tx.type_id, &tx.client_id, &tx.tx_id, &tx.amount);
-                    println!(
-                        "dispute --> tx_id: {}, client {}, available: {}, held: {}, total: {}, locked: {}",
-                        tx_id, self.client_id, self.available, self.held, self.total, self.locked
-                    );
+                    // println!(
+                    //     "dispute --> tx_id: {}, client {}, available: {}, held: {}, total: {}, locked: {}",
+                    //     tx_id, self.client_id, self.available, self.held, self.total, self.locked
+                    // );
                 }
             }
             TxRecordType::RESOLVE => {
@@ -153,10 +153,10 @@ impl Account {
                     tx.conflict_type_id = TxRecordType::RESOLVE;
                     tx_history.set_tx(&tx.type_id, &tx.client_id, &tx.tx_id, &tx.amount);
 
-                    println!(
-                        "resolve --> tx_id: {}, client {}, available: {}, held: {}, total: {}, locked: {}",
-                        tx_id, self.client_id, self.available, self.held, self.total, self.locked
-                    );
+                    // println!(
+                    //     "resolve --> tx_id: {}, client {}, available: {}, held: {}, total: {}, locked: {}",
+                    //     tx_id, self.client_id, self.available, self.held, self.total, self.locked
+                    // );
                 }
             }
             TxRecordType::CHARGEBACK => {
@@ -182,10 +182,10 @@ impl Account {
                     tx_history.set_tx(&tx.type_id, &tx.client_id, &tx.tx_id, &tx.amount);
                     self.locked = true;
 
-                    println!(
-                        "chargeback --> tx_id: {}, client {}, available: {}, held: {}, total: {}, locked: {}",
-                        tx_id, self.client_id, self.available, self.held, self.total, self.locked
-                    );
+                    // println!(
+                    //     "chargeback --> tx_id: {}, client {}, available: {}, held: {}, total: {}, locked: {}",
+                    //     tx_id, self.client_id, self.available, self.held, self.total, self.locked
+                    // );
                 }
             }
             _ => {}
