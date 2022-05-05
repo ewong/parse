@@ -144,12 +144,8 @@ impl<'a> Processor<'a> {
     }
 
     fn update_balances(&self) -> Result<(), AppError> {
-        println!("booyah!");
         let summary_files = SummaryPath::paths(true, &self.csv_summary_dir)?;
         let mut account_files = SummaryPath::paths(false, ACCOUNT_DIR)?;
-
-        println!("{:?}", summary_files);
-        println!("{:?}", account_files);
 
         let num_threads: u16;
         if summary_files.len() + account_files.len() > u16::MAX as usize {

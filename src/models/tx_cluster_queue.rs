@@ -97,19 +97,6 @@ where
             if let Some(wtr) = &mut wtr_opt {
                 wtr.set_writer(&dir_path, &file_name)?;
                 wtr.write_records(records)?;
-                // if let Some(set) = entry.tx_conflict_map().get(client_id) {
-                //     if let Some(deposit_withdraw_map) =
-                //         entry.tx_deposit_withdraw_map().get(client_id)
-                //     {
-                //         wtr.write_conflicts(
-                //             &dir_path,
-                //             &file_name,
-                //             set,
-                //             deposit_withdraw_map,
-                //             records,
-                //         )?;
-                //     }
-                // }
             }
         }
 

@@ -1,8 +1,12 @@
+use chrono::Utc;
 use crossbeam_channel::{Receiver, Sender};
 use std::fs;
+use std::path::Path;
 use std::sync::{Arc, RwLock};
+use std::thread::AccessError;
+use std::time::Duration;
 
-use crate::lib::constants::ACCOUNT_DIR;
+use crate::lib::constants::{ACCOUNT_BACKUP_DIR, ACCOUNT_DIR};
 use crate::lib::error::AppError;
 use crate::lib::tx_queue::TxQueue;
 
@@ -13,12 +17,14 @@ const THREAD_SLEEP_DURATION: u64 = 100;
 pub trait SummaryPathData: Send + Sync + 'static {
     fn update_file(&self) -> bool;
     fn file_path(&self) -> &str;
+    fn file_name(&self) -> &str;
 }
 
 #[derive(Debug)]
 pub struct SummaryPath {
     update_file: bool,
     file_path: String,
+    file_name: String,
 }
 
 impl SummaryPath {
@@ -26,6 +32,7 @@ impl SummaryPath {
         Self {
             update_file: true,
             file_path: "".to_string(),
+            file_name: "".to_string(),
         }
     }
 
@@ -40,9 +47,19 @@ impl SummaryPath {
                         return SummaryPath::new();
                     }
 
+                    let file_path = path.path().display().to_string();
+                    let file_name = path
+                        .path()
+                        .file_name()
+                        .unwrap()
+                        .to_str()
+                        .unwrap()
+                        .to_string();
+
                     return SummaryPath {
                         update_file,
-                        file_path: path.path().display().to_string(),
+                        file_path,
+                        file_name,
                     };
                 }
                 SummaryPath::new()
@@ -61,6 +78,10 @@ impl SummaryPathData for SummaryPath {
 
     fn file_path(&self) -> &str {
         &self.file_path
+    }
+
+    fn file_name(&self) -> &str {
+        &self.file_name
     }
 }
 
@@ -136,6 +157,28 @@ where
     }
 
     fn process_entry(_out_dir: &str, entry: &T) -> Result<(), AppError> {
+        if entry.update_file() {
+            let account_file = [ACCOUNT_DIR, entry.file_name()].join("/");
+            if Path::new(&account_file).exists() {
+                let backup_file = [
+                    ACCOUNT_BACKUP_DIR,
+                    "/",
+                    &entry.file_name().replace(
+                        ".csv",
+                        &["_", &Utc::now().timestamp_millis().to_string(), ".csv"].join(""),
+                    ),
+                ]
+                .join("");
+                let _ = fs::copy(&account_file, backup_file);
+                let _ = fs::remove_file(&account_file);
+            }
+
+            let _ = fs::copy(&entry.file_path(), account_file);
+            let _ = fs::remove_file(&entry.file_path());
+            return Ok(());
+        }
+
+        // otherwise, broadcast the balance
         println!(
             "updating balances !!!! {}, {}",
             entry.update_file(),

@@ -1,4 +1,5 @@
 pub const ACCOUNT_DIR: &str = "data/account";
+pub const ACCOUNT_BACKUP_DIR: &str = "data/account_backup";
 pub const TRANSACTION_DIR: &str = "data/transaction";
 pub const CLUSTER_DIR: &str = "data/cluster";
 pub const SUMMARY_DIR: &str = "data/summary";
