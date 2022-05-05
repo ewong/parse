@@ -74,14 +74,12 @@ impl TxHistory {
         let data = TxRow::to_string(tx_type, client_id, tx_id, amount);
         let result = self.db.insert(key.as_bytes(), data.as_bytes());
 
-        // println!("tx_id {} updated", tx_id);
         result.is_ok()
     }
 
     pub fn get_tx(&mut self, tx_id: &u32) -> Option<TxRow> {
         // check cache
-        if let Some(row) = self.cache.get(&tx_id) {
-            // println!("found in cache: {:?}", row);
+        if let Some(row) = self.cache.get(tx_id) {
             return Some(row.clone());
         }
 
@@ -89,7 +87,6 @@ impl TxHistory {
             if let Some(data) = row {
                 if let Ok(string) = String::from_utf8(data.to_vec()) {
                     let row = TxRow::new_from_string(&string);
-                    // println!("found in db: {:?}", row);
                     self.cache.insert(tx_id.clone(), row.clone());
                     return Some(row);
                 }

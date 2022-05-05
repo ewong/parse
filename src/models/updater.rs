@@ -1,11 +1,10 @@
 use chrono::Utc;
 use crossbeam_channel::{bounded, select, unbounded, Receiver, Sender};
-use std::collections::HashMap;
 use std::path::Path;
 use std::time::Duration;
 use std::{fs, thread};
 
-use super::account::{Account, AccountPath};
+use super::account::AccountPath;
 use crate::lib::constants::{ACCOUNT_BACKUP_DIR, ACCOUNT_DIR};
 use crate::lib::error::AppError;
 
@@ -45,7 +44,6 @@ impl Updater {
             .map_err(|e| AppError::new(PATH, "add", "00", &e.to_string()))?;
         loop {
             if self.tx.len() >= MAX_NUM_RECORDS {
-                println!("balancer is sleeping");
                 thread::sleep(Duration::from_millis(THREAD_SLEEP_DURATION));
             } else {
                 break;
@@ -85,7 +83,6 @@ impl Updater {
             }
             manager.listen();
         });
-        println!("spawned load balancer");
 
         Ok(())
     }
@@ -147,8 +144,7 @@ impl LoadManager {
         for r in &self.worker_rx_channels {
             let _ = r.recv().unwrap();
         }
-        self.tx.send(Ok(())).unwrap();
-        println!("balancer shutting down");
+        let _ = self.tx.send(Ok(()));
     }
 
     fn spawn_worker(&mut self) {
@@ -161,14 +157,12 @@ impl LoadManager {
         let rx = worker_rx.clone();
         let mut worker = Worker::new(wid, tx, rx);
         thread::spawn(move || worker.listen());
-        println!("spawned worker {}", wid);
         self.num_workers += 1;
     }
 }
 
 struct Worker {
     id: u16,
-    account_map: HashMap<u16, Account>,
     tx: Sender<Result<u16, AppError>>,
     rx: Receiver<Option<Vec<AccountPath>>>,
 }
@@ -179,12 +173,7 @@ impl Worker {
         tx: Sender<Result<u16, AppError>>,
         rx: Receiver<Option<Vec<AccountPath>>>,
     ) -> Self {
-        Self {
-            id,
-            tx,
-            rx,
-            account_map: HashMap::new(),
-        }
+        Self { id, tx, rx }
     }
 
     fn listen(&mut self) {
@@ -194,41 +183,39 @@ impl Worker {
                     if let Ok(block) = packet {
                         if let Some(account_paths) = block {
                             for entry in account_paths {
+                                if entry.update_file {
+                                    let account_file = [ACCOUNT_DIR, &entry.file_name].join("/");
+                                    if Path::new(&account_file).exists() {
+                                        let backup_file = [
+                                            ACCOUNT_BACKUP_DIR,
+                                            "/",
+                                            &entry.file_name.replace(
+                                                ".csv",
+                                                &["_", &Utc::now().timestamp_millis().to_string(), ".csv"].join(""),
+                                            ),
+                                        ]
+                                        .join("");
+                                        let _ = fs::copy(&account_file, backup_file);
+                                        let _ = fs::remove_file(&account_file);
+                                    }
 
-                            if entry.update_file {
-                                let account_file = [ACCOUNT_DIR, &entry.file_name].join("/");
-                                if Path::new(&account_file).exists() {
-                                    let backup_file = [
-                                        ACCOUNT_BACKUP_DIR,
-                                        "/",
-                                        &entry.file_name.replace(
-                                            ".csv",
-                                            &["_", &Utc::now().timestamp_millis().to_string(), ".csv"].join(""),
-                                        ),
-                                    ]
-                                    .join("");
-                                    let _ = fs::copy(&account_file, backup_file);
-                                    let _ = fs::remove_file(&account_file);
+                                    let _ = fs::copy(&entry.file_path, &account_file);
+                                    let _ = fs::remove_file(&entry.file_path);
+                                    continue;
                                 }
 
-                                let _ = fs::copy(&entry.file_path, &account_file);
-                                let _ = fs::remove_file(&entry.file_path);
-                                continue;
-                            }
+                                let result = fs::read_to_string(&entry.file_path).map_err(|e| {
+                                    AppError::new(
+                                        PATH,
+                                        "process_entry",
+                                        &["00", &entry.file_path].join(" | "),
+                                        &e.to_string(),
+                                    )
+                                });
 
-                            let result = fs::read_to_string(&entry.file_path).map_err(|e| {
-                                AppError::new(
-                                    PATH,
-                                    "process_entry",
-                                    &["00", &entry.file_path].join(" | "),
-                                    &e.to_string(),
-                                )
-                            });
-
-                            if result.is_ok() {
-                                println!("{}", result.unwrap().replace("\n", ""));
-                            }
-
+                                if result.is_ok() {
+                                    println!("{}", result.unwrap().replace("\n", ""));
+                                }
                             }
                         } else {
                             self.shutdown();
@@ -244,7 +231,6 @@ impl Worker {
     }
 
     fn shutdown(&mut self) {
-        self.tx.send(Ok(self.id)).unwrap();
-        println!("worker {} shutdown", self.id);
+        let _ = self.tx.send(Ok(self.id));
     }
 }

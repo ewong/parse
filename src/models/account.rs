@@ -24,22 +24,7 @@ pub struct Account {
 }
 
 impl Account {
-    pub fn new(client_id: u16, account_dir: &str) -> Self {
-        let user_opt = Self::load_from_file(client_id, account_dir);
-
-        if user_opt.is_none() {
-            return Self {
-                client_id,
-                available: Decimal::new(0, 0),
-                held: Decimal::new(0, 0),
-                total: Decimal::new(0, 0),
-                locked: false,
-            };
-        }
-        user_opt.unwrap()
-    }
-
-    pub fn new_for_balancer(client_id: u16, summary_dir: &str) -> Self {
+    pub fn new(client_id: u16, summary_dir: &str) -> Self {
         let mut user_opt = Self::load_from_file(client_id, summary_dir);
 
         if user_opt.is_none() {
@@ -233,17 +218,8 @@ pub struct AccountPath {
 }
 
 impl AccountPath {
-    pub fn new() -> Self {
-        Self {
-            update_file: true,
-            file_path: "".to_string(),
-            file_name: "".to_string(),
-        }
-    }
-
     pub fn paths(update_file: bool, dir: &str) -> Result<Vec<Vec<AccountPath>>, AppError> {
         let mut row = 0;
-        let mut block = 0;
         let mut paths: Vec<Vec<AccountPath>> = Vec::new();
 
         let p =
@@ -278,10 +254,13 @@ impl AccountPath {
             row += 1;
             if row == 1000 {
                 row = 0;
-                block += 1;
                 paths.push(v);
                 v = Vec::new();
             }
+        }
+
+        if v.len() > 0 {
+            paths.push(v);
         }
 
         Ok(paths)

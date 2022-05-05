@@ -73,28 +73,6 @@ impl TxRecordType {
         return false;
     }
 
-    // pub fn as_binary(&self) -> &[u8] {
-    //     match self {
-    //         Self::DEPOSIT => B_DEPOSIT,
-    //         Self::WITHDRAW => B_WITHDRAW,
-    //         Self::DISPUTE => B_DISPUTE,
-    //         Self::RESOLVE => B_RESOLVE,
-    //         Self::CHARGEBACK => B_CHARGEBACK,
-    //         _ => b"",
-    //     }
-    // }
-
-    // pub fn as_u8(&self) -> u8 {
-    //     match self {
-    //         Self::DEPOSIT => 0,
-    //         Self::WITHDRAW => 1,
-    //         Self::DISPUTE => 2,
-    //         Self::RESOLVE => 3,
-    //         Self::CHARGEBACK => 4,
-    //         _ => 5,
-    //     }
-    // }
-
     pub fn to_string(&self) -> String {
         match self {
             Self::DEPOSIT => "deposit".to_string(),

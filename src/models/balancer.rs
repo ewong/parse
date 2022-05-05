@@ -47,7 +47,6 @@ impl Balancer {
             .map_err(|e| AppError::new(PATH, "add", "00", &e.to_string()))?;
         loop {
             if self.tx.len() >= MAX_NUM_RECORDS {
-                println!("balancer is sleeping");
                 thread::sleep(Duration::from_millis(THREAD_SLEEP_DURATION));
             } else {
                 break;
@@ -87,7 +86,6 @@ impl Balancer {
             }
             manager.listen();
         });
-        println!("spawned load balancer");
 
         Ok(())
     }
@@ -166,8 +164,7 @@ impl LoadManager {
         for r in &self.worker_rx_channels {
             let _ = r.recv().unwrap();
         }
-        self.tx.send(Ok(())).unwrap();
-        println!("balancer shutting down");
+        let _ = self.tx.send(Ok(()));
     }
 
     fn spawn_worker(&mut self) {
@@ -180,7 +177,6 @@ impl LoadManager {
         let rx = worker_rx.clone();
         let mut worker = Worker::new(wid, &self.summary_dir, tx, rx);
         thread::spawn(move || worker.listen());
-        println!("spawned worker {}", wid);
         self.num_workers += 1;
     }
 }
@@ -215,20 +211,21 @@ impl Worker {
                 recv(self.rx) -> packet => {
                     if let Ok(block) = packet {
                         if let Some(tuple) = block {
-                            //println!("worker {} got client id: {}, num row: {}", self.id, tuple.0, tuple.1.len());
                             let client_id = tuple.0;
                             let tx_rows = tuple.1;
                             let mut account: Account;
                             if self.account_map.contains_key(&client_id) {
                                 account = self.account_map.get(&client_id).unwrap().clone();
                             } else {
-                                account = Account::new_for_balancer(client_id, &self.summary_dir);
+                                account = Account::new(client_id, &self.summary_dir);
                             }
                             let mut tx_history = TxHistory::new(&client_id);
                             for row in &tx_rows {
                                 account.handle_tx(&row.type_id, &row.tx_id, &row.amount, &mut tx_history);
+                                tx_history.set_tx(&row.type_id, &row.client_id, &row.tx_id, &row.amount);
                             }
                             let result = account.write_to_csv(&self.summary_dir);
+
                             if result.is_err() {
                                 self.tx.send(Err(result.err().unwrap())).unwrap();
                                 self.shutdown();
@@ -248,7 +245,6 @@ impl Worker {
     }
 
     fn shutdown(&mut self) {
-        self.tx.send(Ok(self.id)).unwrap();
-        println!("worker {} shutdown", self.id);
+        let _ = self.tx.send(Ok(self.id));
     }
 }

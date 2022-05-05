@@ -33,18 +33,13 @@ impl TxReader {
 
     pub fn new_reader(csv_path: &str) -> Result<Reader<File>, AppError> {
         let f = fs::File::open(&csv_path)
-            .map_err(|e| AppError::new(PATH, "csv_reader", "00", &e.to_string()))?;
+            .map_err(|e| AppError::new(PATH, "csv_reader", &["00", csv_path].join("| "), &e.to_string()))?;
         // println!("size of file: {}", f.metadata().unwrap().len());
         Ok(csv::ReaderBuilder::new()
             .has_headers(false)
             .flexible(true)
             .trim(Trim::All)
             .from_reader(f))
-    }
-
-    pub fn set_reader(&mut self, csv_path: &str) -> Result<(), AppError> {
-        self.reader = Self::new_reader(csv_path)?;
-        Ok(())
     }
 
     pub fn byte_record(&self) -> &ByteRecord {

@@ -17,11 +17,6 @@ impl TxWriter {
         Ok(Self { writer })
     }
 
-    pub fn set_writer(&mut self, dir_path: &str, file_name: &str) -> Result<(), AppError> {
-        self.writer = Self::new_writer(dir_path, file_name)?;
-        Ok(())
-    }
-
     pub fn write_records(&mut self, records: &Vec<ByteRecord>) -> Result<(), AppError> {
         for record in records {
             self.writer
