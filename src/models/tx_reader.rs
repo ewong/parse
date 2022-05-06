@@ -32,8 +32,14 @@ impl TxReader {
     }
 
     pub fn new_reader(csv_path: &str) -> Result<Reader<File>, AppError> {
-        let f = fs::File::open(&csv_path)
-            .map_err(|e| AppError::new(PATH, "csv_reader", &["00", csv_path].join("| "), &e.to_string()))?;
+        let f = fs::File::open(&csv_path).map_err(|e| {
+            AppError::new(
+                PATH,
+                "csv_reader",
+                &["00", csv_path].join("| "),
+                &e.to_string(),
+            )
+        })?;
         // println!("size of file: {}", f.metadata().unwrap().len());
         Ok(csv::ReaderBuilder::new()
             .has_headers(false)
@@ -74,12 +80,9 @@ impl TxReader {
             return false;
         }
 
-        if self.byte_record.len() == 0 {
-            // end of file
+        if self.byte_record.len() < 3 {
             return false;
         }
-
-        // todo: trap for blank lines
 
         // validate
         let mut tx_record_type = TxRecordType::from_binary(&self.byte_record[TYPE_POS]);

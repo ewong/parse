@@ -171,14 +171,14 @@ pub struct TxConflict {
 }
 
 impl TxConflict {
-    pub fn new(tx_id: u32, type_id: TxRecordType, state_id: TxRecordType, amount: Decimal) -> Self {
-        Self {
-            tx_id,
-            type_id,
-            state_id,
-            amount,
-        }
-    }
+    // pub fn new(tx_id: u32, type_id: TxRecordType, state_id: TxRecordType, amount: Decimal) -> Self {
+    //     Self {
+    //         tx_id,
+    //         type_id,
+    //         state_id,
+    //         amount,
+    //     }
+    // }
 
     pub fn key(tx_id: &u32) -> String {
         return ["c_", &tx_id.to_string()].join("");
