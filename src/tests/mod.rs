@@ -11,3 +11,6 @@ mod processor_dispute_test;
 
 #[cfg(test)]
 mod processor_resolve_test;
+
+#[cfg(test)]
+mod processor_chargeback_test;

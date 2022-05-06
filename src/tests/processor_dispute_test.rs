@@ -1,13 +1,9 @@
 use rust_decimal::Decimal;
 
 use super::helpers::helper::TestHelper;
-use crate::lib::constants::{ACCOUNT_DIR, SUMMARY_DIR};
+use crate::lib::constants::ACCOUNT_DIR;
 use crate::models::account::Account;
 use crate::models::processor::Processor;
-
-// dispute
-// - dispute on a disputed account
-// - dispute on a resolved account that
 
 #[test]
 fn process_dispute_base_test() {
@@ -38,7 +34,6 @@ fn process_dispute_base_test() {
     assert_eq!(account.total, Decimal::new(2, 0));
     assert!(!account.locked);
 
-    TestHelper::remove_dir(&[SUMMARY_DIR, "5"].join("/"));
     TestHelper::remove_file(&[ACCOUNT_DIR, "5.csv"].join("/"));
 }
 
@@ -70,7 +65,6 @@ fn process_dispute_tx_dne_test() {
     assert_eq!(account.total, Decimal::new(14, 0));
     assert!(!account.locked);
 
-    TestHelper::remove_dir(&[SUMMARY_DIR, "6"].join("/"));
     TestHelper::remove_file(&[ACCOUNT_DIR, "6.csv"].join("/"));
 }
 
@@ -104,22 +98,5 @@ fn process_dispute_existing_dispute_test() {
     assert_eq!(account.total, Decimal::new(17, 0));
     assert!(!account.locked);
 
-    TestHelper::remove_dir(&[SUMMARY_DIR, "8"].join("/"));
     TestHelper::remove_file(&[ACCOUNT_DIR, "8.csv"].join("/"));
 }
-
-
-/*
-    resolve
-    - tx doesn't exist
-    - resolve on a clean account => ignore
-    - resolve on a disputed account => process
-    - resolve on a tx that has been resolved => ignore
-
-    chargeback
-    - tx doesn't exist
-    - deposit on a locked account
-    - withdraw on a locked account
-    - dispute on a frozen account
-    - chargeback on a frozen account
-*/

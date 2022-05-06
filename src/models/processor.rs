@@ -6,7 +6,9 @@ use super::tx_cluster::TxCluster;
 use super::tx_reader::TxReader;
 use super::tx_record::TxRow;
 use super::updater::Updater;
-use crate::lib::constants::{ACCOUNT_DIR, FN_NEW, SUMMARY_DIR, TRANSACTION_DIR};
+use crate::lib::constants::{
+    ACCOUNT_BACKUP_DIR, ACCOUNT_DIR, FN_NEW, SUMMARY_DIR, TRANSACTION_DIR,
+};
 use crate::lib::error::AppError;
 // use crate::lib::timer::Timer;
 
@@ -22,10 +24,15 @@ impl<'a> Processor<'a> {
     pub fn new(source_csv_path: &'a str) -> Result<Self, AppError> {
         let csv_summary_dir = Self::csv_base_dir(source_csv_path, SUMMARY_DIR)?;
 
+        let _ = fs::remove_dir_all(&csv_summary_dir);
+
         fs::create_dir_all(csv_summary_dir.clone())
             .map_err(|e| AppError::new(PATH, FN_NEW, "1", &e.to_string()))?;
 
         fs::create_dir_all(ACCOUNT_DIR.clone())
+            .map_err(|e| AppError::new(PATH, FN_NEW, "2", &e.to_string()))?;
+
+        fs::create_dir_all(ACCOUNT_BACKUP_DIR.clone())
             .map_err(|e| AppError::new(PATH, FN_NEW, "2", &e.to_string()))?;
 
         fs::create_dir_all(TRANSACTION_DIR.clone())
