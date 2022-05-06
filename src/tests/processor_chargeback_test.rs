@@ -345,20 +345,20 @@ fn process_chargeback_multi_test() {
     // --------- //
 
     // type,client,tx,amount
-    // deposit,25,1,10
-    // deposit,25,2,11
+    // deposit,26,1,10
+    // deposit,26,2,11
     
     // type,client,tx,amount
-    // dispute,25,1
-    // deposit,25,3,12
-    // withdraw,25,4,50
+    // dispute,26,1
+    // deposit,26,3,12
+    // withdraw,26,4,50
 
     // type,client,tx,amount
-    // withdraw,25,5,11
-    // resolve,25,1
-    // deposit,25,6,12
+    // withdraw,26,5,11
+    // deposit,26,6,12
+    // chargeback,26,1
 
-    let client_id = 25;
+    let client_id = 26;
     let result = Processor::new("src/tests/csv/chargeback_multi_0.csv");
     assert!(result.is_ok());
 
@@ -380,10 +380,10 @@ fn process_chargeback_multi_test() {
 
     let account = Account::new(client_id, ACCOUNT_DIR);
     assert_eq!(account.client_id, client_id);
-    assert_eq!(account.available, Decimal::new(34, 0));
+    assert_eq!(account.available, Decimal::new(24, 0));
     assert_eq!(account.held, Decimal::new(0, 0));
-    assert_eq!(account.total, Decimal::new(34, 0));
-    assert!(!account.locked);
+    assert_eq!(account.total, Decimal::new(24, 0));
+    assert!(account.locked);
 
     TestHelper::clean(&client_id);
 }
