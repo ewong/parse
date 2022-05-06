@@ -4,7 +4,10 @@ use csv::{ByteRecord, Reader, Trim};
 use rust_decimal::Decimal;
 
 use super::tx_record::{TxRecord, TxRecordSmall, TxRecordType};
-use crate::lib::{constants::TYPE_POS, error::AppError};
+use crate::lib::{
+    constants::{MIN_CSV_ROW_LEN, TYPE_POS},
+    error::AppError,
+};
 
 const PATH: &str = "model/tx_reader";
 pub struct TxReader {
@@ -80,7 +83,7 @@ impl TxReader {
             return false;
         }
 
-        if self.byte_record.len() < 3 {
+        if self.byte_record.len() < MIN_CSV_ROW_LEN {
             return false;
         }
 
@@ -92,13 +95,16 @@ impl TxReader {
                 let result = self.reader.read_byte_record(&mut self.byte_record);
                 if result.is_err() {
                     let e = result.err().unwrap();
-                    self.error = Some(e.to_string());
+                    self.error = Some(format!("{:?} | {}", self.byte_record, &e.to_string()));
                     return false;
                 }
                 // reset tx_record_type value
                 tx_record_type = TxRecordType::from_binary(&self.byte_record[TYPE_POS]);
             } else {
-                self.error = Some("invalid transaction record type".to_string());
+                self.error = Some(format!(
+                    "{:?} --> invalid transaction record type",
+                    self.byte_record
+                ));
                 return false;
             }
         }

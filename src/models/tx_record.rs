@@ -3,7 +3,7 @@ use rust_decimal::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::str;
 
-use crate::lib::constants::{AMOUNT_POS, CLIENT_POS, TX_POS, TYPE_POS};
+use crate::lib::constants::{AMOUNT_POS, CLIENT_POS, MAX_CSV_ROW_LEN, TX_POS, TYPE_POS};
 
 const B_DEPOSIT: &[u8] = b"deposit";
 const B_WITHDRAW: &[u8] = b"withdraw";
@@ -53,6 +53,10 @@ impl TxRecordType {
     }
 
     pub fn header_type(record: &ByteRecord) -> bool {
+        if record.len() != MAX_CSV_ROW_LEN {
+            return false;
+        }
+
         if &record[TYPE_POS] == b"type"
             || &record[CLIENT_POS] == b"client"
             || &record[TX_POS] == b"tx"
