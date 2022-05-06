@@ -44,6 +44,17 @@ impl<'a> Processor<'a> {
         })
     }
 
+    #[allow(dead_code)]
+    pub fn set_source_path(&mut self, source_csv_path: &'a str) -> Result<(), AppError> {
+        let csv_summary_dir = Self::csv_base_dir(source_csv_path, SUMMARY_DIR)?;
+        let _ = fs::remove_dir_all(&csv_summary_dir);
+        fs::create_dir_all(csv_summary_dir.clone())
+            .map_err(|e| AppError::new(PATH, FN_NEW, "1", &e.to_string()))?;
+        self.source_csv_path = source_csv_path;
+        self.csv_summary_dir = csv_summary_dir;
+        Ok(())
+    }
+
     pub fn process_data(&self, enable_cleanup: bool) -> Result<(), AppError> {
         // let timer = Timer::start();
 

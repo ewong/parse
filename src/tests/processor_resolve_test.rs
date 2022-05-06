@@ -36,7 +36,7 @@ fn process_resolve_base_test() {
     assert_eq!(account.total, Decimal::new(34, 0));
     assert!(!account.locked);
 
-    TestHelper::remove_file(&[ACCOUNT_DIR, "/", &client_id.to_string(), ".csv"].join(""));
+    TestHelper::clean(&client_id);
 }
 
 #[test]
@@ -69,7 +69,7 @@ fn process_resolve_tx_dne_test() {
     assert_eq!(account.total, Decimal::new(34, 0));
     assert!(!account.locked);
 
-    TestHelper::remove_file(&[ACCOUNT_DIR, "/", &client_id.to_string(), ".csv"].join(""));
+    TestHelper::clean(&client_id);
 }
 
 #[test]
@@ -105,5 +105,55 @@ fn process_resolve_dispute_on_resolved_account_test() {
     assert_eq!(account.total, Decimal::new(35, 0));
     assert!(!account.locked);
 
-    TestHelper::remove_file(&[ACCOUNT_DIR, "/", &client_id.to_string(), ".csv"].join(""));
+    TestHelper::clean(&client_id);
+}
+
+#[test]
+fn process_resolve_multi_test() {
+    // --------- //
+    // input csv //
+    // --------- //
+
+    // type,client,tx,amount
+    // deposit,25,1,10
+    // deposit,25,2,11
+    
+    // type,client,tx,amount
+    // dispute,25,1
+    // deposit,25,3,12
+    // withdraw,25,4,50
+
+    // type,client,tx,amount
+    // withdraw,25,5,11
+    // resolve,25,1
+    // deposit,25,6,12
+
+    let client_id = 25;
+    let result = Processor::new("src/tests/csv/resolve_multi_0.csv");
+    assert!(result.is_ok());
+
+    let mut p = result.unwrap();
+    let result = p.process_data(false);
+    assert!(result.is_ok());
+
+    let result = p.set_source_path("src/tests/csv/resolve_multi_1.csv");
+    assert!(result.is_ok());
+
+    let result = p.process_data(false);
+    assert!(result.is_ok());
+
+    let result = p.set_source_path("src/tests/csv/resolve_multi_2.csv");
+    assert!(result.is_ok());
+
+    let result = p.process_data(false);
+    assert!(result.is_ok());
+
+    let account = Account::new(client_id, ACCOUNT_DIR);
+    assert_eq!(account.client_id, client_id);
+    assert_eq!(account.available, Decimal::new(34, 0));
+    assert_eq!(account.held, Decimal::new(0, 0));
+    assert_eq!(account.total, Decimal::new(34, 0));
+    assert!(!account.locked);
+
+    TestHelper::clean(&client_id);
 }

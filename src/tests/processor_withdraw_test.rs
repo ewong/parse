@@ -36,7 +36,7 @@ fn process_withdraw_test() {
     assert_eq!(account.total, Decimal::new(9, 0));
     assert!(!account.locked);
 
-    TestHelper::remove_file(&[ACCOUNT_DIR, "7.csv"].join("/"));
+    TestHelper::clean(&7);
 }
 
 #[test]
@@ -79,5 +79,5 @@ fn process_withdraw_multi_test() {
     assert_eq!(account.total, Decimal::new(9, 0));
     assert!(!account.locked);
 
-    TestHelper::remove_file(&[ACCOUNT_DIR, "/", &client_id.to_string(), ".csv"].join(""));
+    TestHelper::clean(&client_id);
 }

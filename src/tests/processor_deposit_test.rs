@@ -37,12 +37,11 @@ fn process_deposit_test() {
     assert_eq!(account.total, Decimal::new(3, 0));
     assert!(!account.locked);
 
-    TestHelper::remove_file(&[ACCOUNT_DIR, "1.csv"].join("/"));
-    TestHelper::remove_file(&[ACCOUNT_DIR, "2.csv"].join("/"));
-    TestHelper::remove_file(&[ACCOUNT_DIR, "3.csv"].join("/"));
-    TestHelper::remove_file(&[ACCOUNT_DIR, "4.csv"].join("/"));
+    TestHelper::clean(&1);
+    TestHelper::clean(&2);
+    TestHelper::clean(&3);
+    TestHelper::clean(&4);
 }
-
 
 #[test]
 fn process_deposit_multi_test() {
@@ -61,7 +60,7 @@ fn process_deposit_multi_test() {
     // deposit,22,6,2
     // deposit,22,7,2
     // deposit,22,8,2
-    
+
     let client_id = 22;
     let result = Processor::new("src/tests/csv/deposit_multi_0.csv");
     assert!(result.is_ok());
@@ -84,5 +83,5 @@ fn process_deposit_multi_test() {
     assert_eq!(account.total, Decimal::new(12, 0));
     assert!(!account.locked);
 
-    TestHelper::remove_file(&[ACCOUNT_DIR, "/", &client_id.to_string(), ".csv"].join(""));
+    TestHelper::clean(&client_id);
 }

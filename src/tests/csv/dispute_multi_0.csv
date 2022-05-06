@@ -1,0 +1,4 @@
+type,client,tx,amount
+deposit,24,1,1
+deposit,24,2,1
+deposit,24,3,1

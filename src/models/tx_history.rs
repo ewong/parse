@@ -14,22 +14,7 @@ pub struct TxHistory {
 
 impl TxHistory {
     pub fn new(client_id: &u16) -> Self {
-        let path: String;
-        if cfg!(test) {
-            use uuid::Uuid;
-            let id = Uuid::new_v4();
-            path = [
-                TRANSACTION_DIR,
-                "/",
-                &client_id.to_string(),
-                "_db_",
-                &id.to_string(),
-            ]
-            .join("");
-        } else {
-            path = [TRANSACTION_DIR, "/", &client_id.to_string(), "_db"].join("");
-        }
-
+        let path = [TRANSACTION_DIR, "/", &client_id.to_string(), "_db"].join("");
         let db = sled::open(path).unwrap();
         Self {
             client_id: client_id.clone(),
@@ -93,7 +78,6 @@ impl TxHistory {
         let key = tx_id.to_string();
         let data = TxRow::to_string(tx_type, client_id, tx_id, amount);
         let result = self.db.insert(key.as_bytes(), data.as_bytes());
-
         result.is_ok()
     }
 
@@ -139,6 +123,7 @@ impl TxHistory {
         self.conflict_cache.remove(&key.clone());
         let data = TxConflict::to_string(tx_id, type_id, state_id, amount);
         let result = self.db.insert(key.as_bytes(), data.as_bytes());
+        self.commit();
         result.is_ok()
     }
 
