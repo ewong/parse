@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 
 use super::tx_history::TxHistory;
 use super::tx_reader::TxReader;
-use super::tx_record::TxRecordType;
+use super::tx_record::{TxConflict, TxRecordType};
 use super::tx_writer::TxWriter;
 use crate::lib::constants::ACCOUNT_DIR;
 use crate::lib::error::AppError;
@@ -108,11 +108,12 @@ impl Account {
                     return;
                 }
 
-                if let Some(tx) = &mut tx_history.get_tx(tx_id) {
-                    if tx.conflict_type_id != TxRecordType::NONE {
-                        return;
-                    }
+                let key = TxConflict::key(&tx_id);
+                if tx_history.contains_conflict_key(&key) {
+                    return;
+                }
 
+                if let Some(tx) = tx_history.get_tx(&tx_id) {
                     if tx.type_id == TxRecordType::DEPOSIT {
                         self.held += tx.amount;
                         self.available -= tx.amount;
@@ -121,8 +122,12 @@ impl Account {
                     // withdrawal chargebacks are handled like debit card/atm chargebacks.
                     // debit card/atm chargebacks only revert transaction on the chargeback.
 
-                    tx.conflict_type_id = TxRecordType::DISPUTE;
-                    tx_history.set_tx(&tx.type_id, &tx.client_id, &tx.tx_id, &tx.amount);
+                    tx_history.set_conflict(
+                        &tx.tx_id,
+                        &tx.type_id,
+                        &TxRecordType::DISPUTE,
+                        &tx.amount,
+                    );
                     // println!(
                     //     "dispute --> tx_id: {}, client {}, available: {}, held: {}, total: {}, locked: {}",
                     //     tx_id, self.client_id, self.available, self.held, self.total, self.locked
@@ -134,21 +139,25 @@ impl Account {
                     return;
                 }
 
-                if let Some(tx) = &mut tx_history.get_tx(tx_id) {
-                    if tx.conflict_type_id != TxRecordType::DISPUTE {
+                if let Some(conflict) = &mut tx_history.get_conflict(&tx_id) {
+                    if conflict.state_id != TxRecordType::DISPUTE {
                         return;
                     }
 
-                    if tx.type_id == TxRecordType::DEPOSIT {
-                        self.held -= tx.amount;
-                        self.available += tx.amount;
+                    if conflict.type_id == TxRecordType::DEPOSIT {
+                        self.held -= conflict.amount;
+                        self.available += conflict.amount;
                     }
                     // if the resolve is on a withdrawal we do nothing.
                     // withdrawal chargebacks are handled like debit card/atm chargebacks.
                     // debit card/atm chargebacks only revert transaction on the chargeback.
 
-                    tx.conflict_type_id = TxRecordType::RESOLVE;
-                    tx_history.set_tx(&tx.type_id, &tx.client_id, &tx.tx_id, &tx.amount);
+                    tx_history.set_conflict(
+                        &conflict.tx_id,
+                        &conflict.type_id,
+                        &TxRecordType::RESOLVE,
+                        &conflict.amount,
+                    );
 
                     // println!(
                     //     "resolve --> tx_id: {}, client {}, available: {}, held: {}, total: {}, locked: {}",
@@ -161,22 +170,27 @@ impl Account {
                     return;
                 }
 
-                if let Some(tx) = &mut tx_history.get_tx(tx_id) {
-                    if tx.conflict_type_id != TxRecordType::DISPUTE {
+                if let Some(conflict) = &mut tx_history.get_conflict(tx_id) {
+                    if conflict.state_id != TxRecordType::DISPUTE {
                         return;
                     }
 
-                    if tx.type_id == TxRecordType::DEPOSIT {
-                        self.held -= tx.amount;
-                        self.total -= tx.amount;
-                    } else if tx.type_id == TxRecordType::WITHDRAW {
+                    if conflict.type_id == TxRecordType::DEPOSIT {
+                        self.held -= conflict.amount;
+                        self.total -= conflict.amount;
+                    } else if conflict.type_id == TxRecordType::WITHDRAW {
                         // if the chargeback is on a withdrawal reimburse the client the amount of the withdrawal.
-                        self.available += tx.amount;
-                        self.total += tx.amount;
+                        self.available += conflict.amount;
+                        self.total += conflict.amount;
                     }
 
-                    tx.conflict_type_id = TxRecordType::CHARGEBACK;
-                    tx_history.set_tx(&tx.type_id, &tx.client_id, &tx.tx_id, &tx.amount);
+                    tx_history.set_conflict(
+                        &conflict.tx_id,
+                        &conflict.type_id,
+                        &TxRecordType::CHARGEBACK,
+                        &conflict.amount,
+                    );
+
                     self.locked = true;
 
                     // println!(

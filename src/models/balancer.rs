@@ -11,6 +11,7 @@ use crate::lib::error::AppError;
 
 const MAX_NUM_RECORDS: usize = 10;
 const THREAD_SLEEP_DURATION: u64 = 250;
+const NUM_WORKERS: u16 = 32;
 
 const PATH: &str = "model/balancer";
 
@@ -81,7 +82,7 @@ impl Balancer {
 
         let mut manager = LoadManager::new(&self.summary_dir, child_tx, child_rx);
         thread::spawn(move || {
-            for _ in 0..63 {
+            for _ in 0..NUM_WORKERS - 1 {
                 manager.spawn_worker();
             }
             manager.listen();

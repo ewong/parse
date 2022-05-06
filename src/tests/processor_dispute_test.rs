@@ -6,8 +6,6 @@ use crate::models::account::Account;
 use crate::models::processor::Processor;
 
 // dispute
-// - tx exists
-// - tx doesn't exist
 // - dispute on a disputed account
 // - dispute on a resolved account that
 
@@ -75,6 +73,41 @@ fn process_dispute_tx_dne_test() {
     TestHelper::remove_dir(&[SUMMARY_DIR, "6"].join("/"));
     TestHelper::remove_file(&[ACCOUNT_DIR, "6.csv"].join("/"));
 }
+
+#[test]
+fn process_dispute_existing_dispute_test() {
+    // --------- //
+    // input csv //
+    // --------- //
+
+    // type,client,tx,amount
+    // deposit,8,1,5
+    // deposit,8,2,10
+    // withdraw,8,3,1
+    // dispute,8,1
+    // deposit,8,4,3
+    // dispute,8,1
+    // dispute,8,1
+
+    let result = Processor::new("src/tests/csv/dispute_existing_dispute.csv");
+    assert!(result.is_ok());
+
+    let p = result.unwrap();
+    let result = p.process_data(false);
+    assert!(result.is_ok());
+
+    // check balance
+    let account = Account::new(8, ACCOUNT_DIR);
+    assert_eq!(account.client_id, 8);
+    assert_eq!(account.available, Decimal::new(12, 0));
+    assert_eq!(account.held, Decimal::new(5, 0));
+    assert_eq!(account.total, Decimal::new(17, 0));
+    assert!(!account.locked);
+
+    TestHelper::remove_dir(&[SUMMARY_DIR, "8"].join("/"));
+    TestHelper::remove_file(&[ACCOUNT_DIR, "8.csv"].join("/"));
+}
+
 
 /*
     resolve

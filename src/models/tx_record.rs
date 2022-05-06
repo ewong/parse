@@ -120,7 +120,6 @@ pub struct TxRow {
     pub client_id: u16,
     pub tx_id: u32,
     pub amount: Decimal,
-    pub conflict_type_id: TxRecordType,
 }
 
 impl TxRow {
@@ -130,18 +129,11 @@ impl TxRow {
             client_id,
             tx_id,
             amount,
-            conflict_type_id: TxRecordType::NONE,
         }
     }
 
     pub fn new_from_string(string: &str) -> Self {
         let a: Vec<&str> = string.split(",").collect();
-        let conflict_type_id: TxRecordType;
-        if a.len() < 5 {
-            conflict_type_id = TxRecordType::NONE;
-        } else {
-            conflict_type_id = TxRecordType::from_binary(a[4].as_bytes());
-        }
         let type_id = TxRecordType::from_binary(a[0].as_bytes());
         let client_id = a[1].parse::<u16>().unwrap();
         let tx_id = a[2].parse::<u32>().unwrap();
@@ -151,7 +143,6 @@ impl TxRow {
             client_id,
             tx_id,
             amount,
-            conflict_type_id,
         }
     }
 
@@ -166,7 +157,59 @@ impl TxRow {
             tx_type.to_string(),
             client_id.to_string(),
             tx_id.to_string(),
-            format!("{:.4}", amount)
+            format!("{:.4}", amount),
+        )
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct TxConflict {
+    pub tx_id: u32,
+    pub type_id: TxRecordType,
+    pub state_id: TxRecordType,
+    pub amount: Decimal,
+}
+
+impl TxConflict {
+    pub fn new(tx_id: u32, type_id: TxRecordType, state_id: TxRecordType, amount: Decimal) -> Self {
+        Self {
+            tx_id,
+            type_id,
+            state_id,
+            amount,
+        }
+    }
+
+    pub fn key(tx_id: &u32) -> String {
+        return ["c_", &tx_id.to_string()].join("");
+    }
+
+    pub fn new_from_string(string: &str) -> Self {
+        let a: Vec<&str> = string.split(",").collect();
+        let tx_id = a[0].replace("c_", "").parse::<u32>().unwrap();
+        let type_id = TxRecordType::from_binary(a[1].as_bytes());
+        let state_id = TxRecordType::from_binary(a[2].as_bytes());
+        let amount = Decimal::from_str(a[3]).unwrap();
+        Self {
+            tx_id,
+            type_id,
+            state_id,
+            amount,
+        }
+    }
+
+    pub fn to_string(
+        tx_id: &u32,
+        type_id: &TxRecordType,
+        state_id: &TxRecordType,
+        amount: &Decimal,
+    ) -> String {
+        format!(
+            "c_{},{},{},{:.4}",
+            tx_id.to_string(),
+            type_id.to_string(),
+            state_id.to_string(),
+            amount
         )
     }
 }

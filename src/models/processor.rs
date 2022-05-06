@@ -8,7 +8,7 @@ use super::tx_record::TxRow;
 use super::updater::Updater;
 use crate::lib::constants::{ACCOUNT_DIR, FN_NEW, SUMMARY_DIR, TRANSACTION_DIR};
 use crate::lib::error::AppError;
-use crate::lib::timer::Timer;
+// use crate::lib::timer::Timer;
 
 const PATH: &str = "model/processor";
 const BLOCK_SIZE: usize = 1_000_000;
@@ -38,7 +38,7 @@ impl<'a> Processor<'a> {
     }
 
     pub fn process_data(&self, enable_cleanup: bool) -> Result<(), AppError> {
-        let timer = Timer::start();
+        // let timer = Timer::start();
 
         let result = self.cluster_transactions();
         if result.is_err() {
@@ -53,7 +53,7 @@ impl<'a> Processor<'a> {
         }
 
         let result = self.show_accounts();
-        timer.stop();
+        // timer.stop();
         result
     }
 
