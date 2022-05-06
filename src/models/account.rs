@@ -160,10 +160,10 @@ impl Account {
                         &conflict.amount,
                     );
 
-                    // println!(
-                    //     "resolve --> tx_id: {}, client {}, available: {}, held: {}, total: {}, locked: {}",
-                    //     tx_id, self.client_id, self.available, self.held, self.total, self.locked
-                    // );
+                    println!(
+                        "resolve --> tx_id: {}, client {}, available: {}, held: {}, total: {}, locked: {}",
+                        tx_id, self.client_id, self.available, self.held, self.total, self.locked
+                    );
                 }
             }
             TxRecordType::CHARGEBACK => {
@@ -194,10 +194,10 @@ impl Account {
                     );
                     self.locked = true;
 
-                    // println!(
-                    //     "chargeback --> tx_id: {}, client {}, available: {}, held: {}, total: {}, locked: {}",
-                    //     tx_id, self.client_id, self.available, self.held, self.total, self.locked
-                    // );
+                    println!(
+                        "chargeback --> tx_id: {}, client {}, available: {}, held: {}, total: {}, locked: {}",
+                        tx_id, self.client_id, self.available, self.held, self.total, self.locked
+                    );
                 }
             }
             _ => {}
