@@ -226,6 +226,7 @@ impl Worker {
                                 tx_history.set_tx(&row.type_id, &row.client_id, &row.tx_id, &row.amount);
                             }
                             let result = account.write_to_csv(&self.summary_dir);
+                            tx_history.commit();
 
                             if result.is_err() {
                                 self.tx.send(Err(result.err().unwrap())).unwrap();

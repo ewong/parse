@@ -108,12 +108,12 @@ impl Account {
                     return;
                 }
 
-                let key = TxConflict::key(&tx_id);
+                let key = TxConflict::key(tx_id);
                 if tx_history.contains_conflict_key(&key) {
                     return;
                 }
 
-                if let Some(tx) = tx_history.get_tx(&tx_id) {
+                if let Some(tx) = tx_history.get_tx(tx_id) {
                     if tx.type_id == TxRecordType::DEPOSIT {
                         self.held += tx.amount;
                         self.available -= tx.amount;
@@ -139,7 +139,7 @@ impl Account {
                     return;
                 }
 
-                if let Some(conflict) = &mut tx_history.get_conflict(&tx_id) {
+                if let Some(conflict) = &mut tx_history.get_conflict(tx_id) {
                     if conflict.state_id != TxRecordType::DISPUTE {
                         return;
                     }
@@ -152,10 +152,11 @@ impl Account {
                     // withdrawal chargebacks are handled like debit card/atm chargebacks.
                     // debit card/atm chargebacks only revert transaction on the chargeback.
 
+                    conflict.state_id = TxRecordType::RESOLVE;
                     tx_history.set_conflict(
                         &conflict.tx_id,
                         &conflict.type_id,
-                        &TxRecordType::RESOLVE,
+                        &conflict.state_id,
                         &conflict.amount,
                     );
 
@@ -184,13 +185,13 @@ impl Account {
                         self.total += conflict.amount;
                     }
 
+                    conflict.state_id = TxRecordType::CHARGEBACK;
                     tx_history.set_conflict(
                         &conflict.tx_id,
                         &conflict.type_id,
-                        &TxRecordType::CHARGEBACK,
+                        &conflict.state_id,
                         &conflict.amount,
                     );
-
                     self.locked = true;
 
                     // println!(

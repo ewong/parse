@@ -89,6 +89,7 @@ impl TxHistory {
             return false;
         }
 
+        self.cache.remove(&tx_id.clone());
         let key = tx_id.to_string();
         let data = TxRow::to_string(tx_type, client_id, tx_id, amount);
         let result = self.db.insert(key.as_bytes(), data.as_bytes());
@@ -110,7 +111,7 @@ impl TxHistory {
     }
 
     pub fn get_conflict(&mut self, tx_id: &u32) -> Option<TxConflict> {
-        let key = TxConflict::key(&tx_id);
+        let key = TxConflict::key(tx_id);
         if let Some(row) = self.conflict_cache.get(&key) {
             return Some(row.clone());
         }
@@ -134,9 +135,14 @@ impl TxHistory {
         state_id: &TxRecordType,
         amount: &Decimal,
     ) -> bool {
-        let key = TxConflict::key(&tx_id);
+        let key = TxConflict::key(tx_id);
+        self.conflict_cache.remove(&key.clone());
         let data = TxConflict::to_string(tx_id, type_id, state_id, amount);
         let result = self.db.insert(key.as_bytes(), data.as_bytes());
         result.is_ok()
+    }
+
+    pub fn commit(&mut self) {
+        let _ = self.db.flush();
     }
 }
