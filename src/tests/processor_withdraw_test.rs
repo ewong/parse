@@ -38,3 +38,46 @@ fn process_withdraw_test() {
 
     TestHelper::remove_file(&[ACCOUNT_DIR, "7.csv"].join("/"));
 }
+
+#[test]
+fn process_withdraw_multi_test() {
+    // --------- //
+    // input csv //
+    // --------- //
+
+    // type,client,tx,amount
+    // withdraw,23,1,5
+    // deposit,23,2,2
+    // withdraw,23,3,3
+    // deposit,23,4,2
+
+    // type,client,tx,amount
+    // withdraw,23,5,1
+    // deposit,23,6,2
+    // withdraw,23,7,1
+    // deposit,23,8,5
+
+    let client_id = 23;
+    let result = Processor::new("src/tests/csv/withdraw_multi_0.csv");
+    assert!(result.is_ok());
+
+    let p = result.unwrap();
+    let result = p.process_data(false);
+    assert!(result.is_ok());
+
+    let result = Processor::new("src/tests/csv/withdraw_multi_1.csv");
+    assert!(result.is_ok());
+
+    let p = result.unwrap();
+    let result = p.process_data(false);
+    assert!(result.is_ok());
+
+    let account = Account::new(client_id, ACCOUNT_DIR);
+    assert_eq!(account.client_id, client_id);
+    assert_eq!(account.available, Decimal::new(9, 0));
+    assert_eq!(account.held, Decimal::new(0, 0));
+    assert_eq!(account.total, Decimal::new(9, 0));
+    assert!(!account.locked);
+
+    TestHelper::remove_file(&[ACCOUNT_DIR, "/", &client_id.to_string(), ".csv"].join(""));
+}
