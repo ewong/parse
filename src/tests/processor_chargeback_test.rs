@@ -11,10 +11,10 @@ use crate::models::processor::Processor;
     x - tx doesn't exist
     x - chargeback on a non-disputed transaction
     x - chargeback on a withdraw
-    - chargeback on a resolved account
-    - deposit on a locked account
-    - withdraw on a locked account
-    - dispute on a frozen account
+    x - chargeback on a resolved account
+    x - deposit on a locked account
+    x - withdraw on a locked account
+    x - dispute on a frozen account
     - resolve on a frozen account
     - chargeback on a frozen account
 */
@@ -184,6 +184,111 @@ fn process_chargeback_on_resolve_test() {
     assert_eq!(account.held, Decimal::new(0, 0));
     assert_eq!(account.total, Decimal::new(22, 0));
     assert!(!account.locked);
+
+    TestHelper::remove_file(&[ACCOUNT_DIR, "/", &client_id.to_string(), ".csv"].join(""));
+}
+
+#[test]
+fn process_chargeback_deposit_test() {
+    // --------- //
+    // input csv //
+    // --------- //
+
+    // type,client,tx,amount
+    // deposit,17,1,10
+    // deposit,17,2,11
+    // deposit,17,3,12
+    // withdraw,17,4,50
+    // withdraw,17,5,11
+    // dispute,17,1
+    // deposit,17,6,12
+    // chargeback,17,1
+    // deposit,17,7,50
+
+    let client_id = 17;
+    let result = Processor::new("src/tests/csv/chargeback_deposit.csv");
+    assert!(result.is_ok());
+
+    let p = result.unwrap();
+    let result = p.process_data(false);
+    assert!(result.is_ok());
+
+    let account = Account::new(client_id, ACCOUNT_DIR);
+    assert_eq!(account.client_id, client_id);
+    assert_eq!(account.available, Decimal::new(24, 0));
+    assert_eq!(account.held, Decimal::new(0, 0));
+    assert_eq!(account.total, Decimal::new(24, 0));
+    assert!(account.locked);
+
+    TestHelper::remove_file(&[ACCOUNT_DIR, "/", &client_id.to_string(), ".csv"].join(""));
+}
+
+#[test]
+fn process_chargeback_withdraw_test() {
+    // --------- //
+    // input csv //
+    // --------- //
+
+    // type,client,tx,amount
+    // deposit,18,1,10
+    // deposit,18,2,11
+    // deposit,18,3,12
+    // withdraw,18,4,50
+    // withdraw,18,5,11
+    // dispute,18,1
+    // deposit,18,6,12
+    // chargeback,18,1
+    // withdraw,18,7,10
+
+    let client_id = 18;
+    let result = Processor::new("src/tests/csv/chargeback_withdraw.csv");
+    assert!(result.is_ok());
+
+    let p = result.unwrap();
+    let result = p.process_data(false);
+    assert!(result.is_ok());
+
+    let account = Account::new(client_id, ACCOUNT_DIR);
+    assert_eq!(account.client_id, client_id);
+    assert_eq!(account.available, Decimal::new(24, 0));
+    assert_eq!(account.held, Decimal::new(0, 0));
+    assert_eq!(account.total, Decimal::new(24, 0));
+    assert!(account.locked);
+
+    TestHelper::remove_file(&[ACCOUNT_DIR, "/", &client_id.to_string(), ".csv"].join(""));
+}
+
+#[test]
+fn process_chargeback_dispute_test() {
+    // --------- //
+    // input csv //
+    // --------- //
+
+    // type,client,tx,amount
+    // deposit,19,1,10
+    // deposit,19,2,11
+    // deposit,19,3,12
+    // withdraw,19,4,50
+    // withdraw,19,5,11
+    // dispute,19,1
+    // deposit,19,6,12
+    // chargeback,19,1
+    // dispute,19,1
+    
+    let client_id = 19;
+    let result = Processor::new("src/tests/csv/chargeback_dispute.csv");
+    assert!(result.is_ok());
+
+    let p = result.unwrap();
+    let result = p.process_data(false);
+    assert!(result.is_ok());
+
+    let account = Account::new(client_id, ACCOUNT_DIR);
+    assert_eq!(account.client_id, client_id);
+    assert_eq!(account.available, Decimal::new(24, 0));
+    assert_eq!(account.held, Decimal::new(0, 0));
+    assert_eq!(account.total, Decimal::new(24, 0));
+    assert!(account.locked);
 
     TestHelper::remove_file(&[ACCOUNT_DIR, "/", &client_id.to_string(), ".csv"].join(""));
 }
