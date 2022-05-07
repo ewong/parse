@@ -130,4 +130,9 @@ impl TxHistory {
     pub fn commit(&mut self) {
         let _ = self.db.flush();
     }
+
+    pub fn clear_cache(&mut self) {
+        self.cache.clear();
+        self.conflict_cache.clear();
+    }
 }
