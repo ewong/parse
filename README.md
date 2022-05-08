@@ -68,8 +68,7 @@ There were two considerations for testing: Correctness and scaling.
 - They can be found in the tests folder, along with the associated csv files.
 
 2. Scaling
-- During development, a surrogate data set was used. It can be found here:
-https://s3-api.us-geo.objectstorage.softlayer.net/cf-courses-data/CognitiveClass/ML0101ENv3/labs/moviedataset.zip
+- During development, a surrogate data set was used. It can be found here: https://grouplens.org/datasets/movielens/20m/
 - Specifically, the ratings csv (620 M) file was used to benchmark the scaling and speed of the system.
 - Instead of calculating the account balance, the average movie rating was calculated per movie.
 - That calculation was later replaced with account balance calculation.
