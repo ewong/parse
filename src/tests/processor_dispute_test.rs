@@ -15,8 +15,8 @@ fn process_dispute_base_test() {
     // deposit,5,1,1
     // deposit,5,2,1
     // deposit,5,3,1
-    // withdraw,5,4,5
-    // withdraw,5,5,1
+    // withdrawal,5,4,5
+    // withdrawal,5,5,1
     // dispute,5,1
 
     let client_id = 5;
@@ -48,7 +48,7 @@ fn process_dispute_tx_dne_test() {
     // dispute,6,1
     // deposit,6,2,5
     // deposit,6,3,10
-    // withdraw,6,4,1
+    // withdrawal,6,4,1
     // dispute,6,50
 
     let client_id = 6;
@@ -79,7 +79,7 @@ fn process_dispute_existing_dispute_test() {
     // type,client,tx,amount
     // deposit,8,1,5
     // deposit,8,2,10
-    // withdraw,8,3,1
+    // withdrawal,8,3,1
     // dispute,8,1
     // deposit,8,4,3
     // dispute,8,1
@@ -116,8 +116,8 @@ fn process_dispute_multi_test() {
     // deposit,24,3,1
 
     // type,client,tx,amount
-    // withdraw,24,4,5
-    // withdraw,24,5,1
+    // withdrawal,24,4,5
+    // withdrawal,24,5,1
     // dispute,24,1
 
     let client_id = 24;

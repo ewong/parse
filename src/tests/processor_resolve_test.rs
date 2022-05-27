@@ -15,8 +15,8 @@ fn process_resolve_base_test() {
     // deposit,9,1,10
     // deposit,9,2,11
     // deposit,9,3,12
-    // withdraw,9,4,50
-    // withdraw,9,5,11
+    // withdrawal,9,4,50
+    // withdrawal,9,5,11
     // dispute,9,1
     // deposit,9,6,12
     // resolve,9,1
@@ -49,8 +49,8 @@ fn process_resolve_tx_dne_test() {
     // deposit,10,1,10
     // deposit,10,2,11
     // deposit,10,3,12
-    // withdraw,10,4,50
-    // withdraw,10,5,11
+    // withdrawal,10,4,50
+    // withdrawal,10,5,11
     // resolve,10,50
     // deposit,10,6,12
 
@@ -82,8 +82,8 @@ fn process_resolve_dispute_on_resolved_account_test() {
     // deposit,11,1,10
     // deposit,11,2,11
     // deposit,11,3,12
-    // withdraw,11,4,50
-    // withdraw,11,5,11
+    // withdrawal,11,4,50
+    // withdrawal,11,5,11
     // dispute,11,1
     // deposit,11,6,12
     // resolve,11,1
@@ -121,10 +121,10 @@ fn process_resolve_multi_test() {
     // type,client,tx,amount
     // dispute,25,1
     // deposit,25,3,12
-    // withdraw,25,4,50
+    // withdrawal,25,4,50
 
     // type,client,tx,amount
-    // withdraw,25,5,11
+    // withdrawal,25,5,11
     // resolve,25,1
     // deposit,25,6,12
 

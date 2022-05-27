@@ -15,8 +15,8 @@ fn process_chargeback_base_test() {
     // deposit,12,1,10
     // deposit,12,2,11
     // deposit,12,3,12
-    // withdraw,12,4,50
-    // withdraw,12,5,11
+    // withdrawal,12,4,50
+    // withdrawal,12,5,11
     // dispute,12,1
     // deposit,12,6,12
     // chargeback,12,1
@@ -49,8 +49,8 @@ fn process_chargeback_tx_dne_test() {
     // deposit,13,1,10
     // deposit,13,2,11
     // deposit,13,3,12
-    // withdraw,13,4,50
-    // withdraw,13,5,11
+    // withdrawal,13,4,50
+    // withdrawal,13,5,11
     // deposit,13,6,12
     // chargeback,13,155
 
@@ -82,8 +82,8 @@ fn process_chargeback_on_non_dispute_test() {
     // deposit,14,1,10
     // deposit,14,2,11
     // deposit,14,3,12
-    // withdraw,14,4,50
-    // withdraw,14,5,11
+    // withdrawal,14,4,50
+    // withdrawal,14,5,11
     // deposit,14,6,12
     // chargeback,14,1
 
@@ -115,8 +115,8 @@ fn process_chargeback_on_withdraw_test() {
     // deposit,15,1,10
     // deposit,15,2,11
     // deposit,15,3,12
-    // withdraw,15,4,12
-    // withdraw,15,5,11
+    // withdrawal,15,4,12
+    // withdrawal,15,5,11
     // dispute,15,4,
     // deposit,15,6,12
     // chargeback,15,4
@@ -149,8 +149,8 @@ fn process_chargeback_on_resolve_test() {
     // deposit,16,1,10
     // deposit,16,2,11
     // deposit,16,3,12
-    // withdraw,16,4,12
-    // withdraw,16,5,11
+    // withdrawal,16,4,12
+    // withdrawal,16,5,11
     // dispute,16,2,
     // deposit,16,6,12
     // resolved,16,2
@@ -184,8 +184,8 @@ fn process_chargeback_deposit_test() {
     // deposit,17,1,10
     // deposit,17,2,11
     // deposit,17,3,12
-    // withdraw,17,4,50
-    // withdraw,17,5,11
+    // withdrawal,17,4,50
+    // withdrawal,17,5,11
     // dispute,17,1
     // deposit,17,6,12
     // chargeback,17,1
@@ -219,12 +219,12 @@ fn process_chargeback_withdraw_test() {
     // deposit,18,1,10
     // deposit,18,2,11
     // deposit,18,3,12
-    // withdraw,18,4,50
-    // withdraw,18,5,11
+    // withdrawal,18,4,50
+    // withdrawal,18,5,11
     // dispute,18,1
     // deposit,18,6,12
     // chargeback,18,1
-    // withdraw,18,7,10
+    // withdrawal,18,7,10
 
     let client_id = 18;
     let result = Processor::new("src/tests/csv/chargeback_withdraw.csv");
@@ -254,8 +254,8 @@ fn process_chargeback_dispute_test() {
     // deposit,19,1,10
     // deposit,19,2,11
     // deposit,19,3,12
-    // withdraw,19,4,50
-    // withdraw,19,5,11
+    // withdrawal,19,4,50
+    // withdrawal,19,5,11
     // dispute,19,1
     // deposit,19,6,12
     // chargeback,19,1
@@ -289,8 +289,8 @@ fn process_chargeback_resolve_test() {
     // deposit,20,1,10
     // deposit,20,2,11
     // deposit,20,3,12
-    // withdraw,20,4,50
-    // withdraw,20,5,11
+    // withdrawal,20,4,50
+    // withdrawal,20,5,11
     // dispute,20,1
     // deposit,20,6,12
     // chargeback,20,1
@@ -351,10 +351,10 @@ fn process_chargeback_multi_test() {
     // type,client,tx,amount
     // dispute,26,1
     // deposit,26,3,12
-    // withdraw,26,4,50
+    // withdrawal,26,4,50
 
     // type,client,tx,amount
-    // withdraw,26,5,11
+    // withdrawal,26,5,11
     // deposit,26,6,12
     // chargeback,26,1
 

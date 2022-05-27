@@ -1,4 +1,4 @@
 type,client,tx,amount
-withdraw,24,4,5
-withdraw,24,5,1
+withdrawal,24,4,5
+withdrawal,24,5,1
 dispute,24,1

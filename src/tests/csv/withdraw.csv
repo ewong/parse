@@ -1,9 +1,9 @@
 type,client,tx,amount
-withdraw,7,1,5
+withdrawal,7,1,5
 deposit,7,2,2
-withdraw,7,3,3
+withdrawal,7,3,3
 deposit,7,4,2
-withdraw,7,5,1
+withdrawal,7,5,1
 deposit,7,6,2
-withdraw,7,7,1
+withdrawal,7,7,1
 deposit,7,1,5

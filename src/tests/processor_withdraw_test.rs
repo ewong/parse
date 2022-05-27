@@ -12,13 +12,13 @@ fn process_withdraw_test() {
     // --------- //
 
     // type,client,tx,amount
-    // withdraw,7,1,5
+    // withdrawal,7,1,5
     // deposit,7,2,2
-    // withdraw,7,3,3
+    // withdrawal,7,3,3
     // deposit,7,4,2
-    // withdraw,7,5,1
+    // withdrawal,7,5,1
     // deposit,7,6,2
-    // withdraw,7,7,1
+    // withdrawal,7,7,1
     // deposit,7,1,5
 
     let result = Processor::new("src/tests/csv/withdraw.csv");
@@ -46,15 +46,15 @@ fn process_withdraw_multi_test() {
     // --------- //
 
     // type,client,tx,amount
-    // withdraw,23,1,5
+    // withdrawal,23,1,5
     // deposit,23,2,2
-    // withdraw,23,3,3
+    // withdrawal,23,3,3
     // deposit,23,4,2
 
     // type,client,tx,amount
-    // withdraw,23,5,1
+    // withdrawal,23,5,1
     // deposit,23,6,2
-    // withdraw,23,7,1
+    // withdrawal,23,7,1
     // deposit,23,8,5
 
     let client_id = 23;

@@ -1,4 +1,4 @@
 type,client,tx,amount
-withdraw,26,5,11
+withdrawal,26,5,11
 deposit,26,6,12
 chargeback,26,1

@@ -6,7 +6,7 @@ use std::str;
 use crate::lib::constants::{AMOUNT_POS, CLIENT_POS, MAX_CSV_ROW_LEN, TX_POS, TYPE_POS};
 
 const B_DEPOSIT: &[u8] = b"deposit";
-const B_WITHDRAW: &[u8] = b"withdraw";
+const B_WITHDRAW: &[u8] = b"withdrawal";
 const B_DISPUTE: &[u8] = b"dispute";
 const B_RESOLVE: &[u8] = b"resolve";
 const B_CHARGEBACK: &[u8] = b"chargeback";
@@ -40,7 +40,7 @@ impl TxRecordType {
         if let Ok(str) = str::from_utf8(binary) {
             return match str.to_lowercase().replace(" ", "").as_str() {
                 "deposit" => Self::DEPOSIT,
-                "withdraw" => Self::WITHDRAW,
+                "withdrawal" => Self::WITHDRAW,
                 "dispute" => Self::DISPUTE,
                 "resolve" => Self::RESOLVE,
                 "chargeback" => Self::CHARGEBACK,
@@ -80,7 +80,7 @@ impl TxRecordType {
     pub fn to_string(&self) -> String {
         match self {
             Self::DEPOSIT => "deposit".to_string(),
-            Self::WITHDRAW => "withdraw".to_string(),
+            Self::WITHDRAW => "withdrawal".to_string(),
             Self::DISPUTE => "dispute".to_string(),
             Self::RESOLVE => "resolve".to_string(),
             Self::CHARGEBACK => "chargeback".to_string(),

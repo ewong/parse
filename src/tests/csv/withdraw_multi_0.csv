@@ -1,5 +1,5 @@
 type,client,tx,amount
-withdraw,23,1,5
+withdrawal,23,1,5
 deposit,23,2,2
-withdraw,23,3,3
+withdrawal,23,3,3
 deposit,23,4,2

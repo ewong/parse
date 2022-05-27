@@ -2,8 +2,8 @@ type,client,tx,amount
 deposit,19,1,10
 deposit,19,2,11
 deposit,19,3,12
-withdraw,19,4,50
-withdraw,19,5,11
+withdrawal,19,4,50
+withdrawal,19,5,11
 dispute,19,1
 deposit,19,6,12
 chargeback,19,1

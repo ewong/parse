@@ -1,4 +1,4 @@
 type,client,tx,amount
 dispute,25,1
 deposit,25,3,12
-withdraw,25,4,50
+withdrawal,25,4,50

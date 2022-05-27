@@ -98,7 +98,7 @@ impl Account {
                     self.available -= *amount;
                     self.total -= *amount;
                     // println!(
-                    //     "withdraw --> client {}, available: {}, held: {}, total: {}, locked: {}",
+                    //     "withdrawal --> client {}, available: {}, held: {}, total: {}, locked: {}",
                     //     self.client_id, self.available, self.held, self.total, self.locked
                     // );
                 }
