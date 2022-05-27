@@ -10,7 +10,6 @@ use crate::lib::constants::{
     ACCOUNT_BACKUP_DIR, ACCOUNT_DIR, FN_NEW, SUMMARY_DIR, TRANSACTION_DIR,
 };
 use crate::lib::error::AppError;
-// use crate::lib::timer::Timer;
 
 const PATH: &str = "model/processor";
 const BLOCK_SIZE: usize = 1_000_000;
@@ -56,8 +55,6 @@ impl<'a> Processor<'a> {
     }
 
     pub fn process_data(&self, enable_cleanup: bool) -> Result<(), AppError> {
-        // let timer = Timer::start();
-
         let result = self.cluster_transactions();
         if result.is_err() {
             self.cleanup(enable_cleanup);
@@ -71,7 +68,6 @@ impl<'a> Processor<'a> {
         }
 
         let result = self.show_accounts();
-        // timer.stop();
         result
     }
 
@@ -95,20 +91,9 @@ impl<'a> Processor<'a> {
 
             rows += 1;
             if rows == BLOCK_SIZE {
-                // if block == 0 {
-                //     println!("----------------------------------------------------");
-                // }
-
-                // println!(
-                //     "add to q --> block: {}, num clients: {}",
-                //     block,
-                //     tx_cluster.tx_row_map().len()
-                // );
-
                 rows = 0;
                 balancer.add(tx_cluster)?;
                 tx_cluster = TxCluster::new();
-                // println!("----------------------------------------------------");
             }
         }
 
@@ -125,11 +110,6 @@ impl<'a> Processor<'a> {
 
         // send remaining data to write queue
         if tx_cluster.tx_row_map.len() > 0 {
-            // println!(
-            //     "send remaining data to write queue --> block: {}, num clients: {}",
-            //     block,
-            //     tx_cluster.tx_row_map().len()
-            // );
             balancer.add(tx_cluster)?;
         }
 

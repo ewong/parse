@@ -84,11 +84,6 @@ impl Account {
                 }
                 self.available += *amount;
                 self.total += *amount;
-
-                // println!(
-                //     "deposit --> client {}, available: {}, held: {}, total: {}, locked: {}",
-                //     self.client_id, self.available, self.held, self.total, self.locked
-                // );
             }
             TxRecordType::WITHDRAW => {
                 if self.locked {
@@ -97,10 +92,6 @@ impl Account {
                 if self.available >= *amount {
                     self.available -= *amount;
                     self.total -= *amount;
-                    // println!(
-                    //     "withdrawal --> client {}, available: {}, held: {}, total: {}, locked: {}",
-                    //     self.client_id, self.available, self.held, self.total, self.locked
-                    // );
                 }
             }
             TxRecordType::DISPUTE => {
@@ -128,10 +119,6 @@ impl Account {
                         &TxRecordType::DISPUTE,
                         &tx.amount,
                     );
-                    // println!(
-                    //     "dispute --> tx_id: {}, client {}, available: {}, held: {}, total: {}, locked: {}",
-                    //     tx_id, self.client_id, self.available, self.held, self.total, self.locked
-                    // );
                 }
             }
             TxRecordType::RESOLVE => {
@@ -159,11 +146,6 @@ impl Account {
                         &conflict.state_id,
                         &conflict.amount,
                     );
-
-                    // println!(
-                    //     "resolve --> tx_id: {}, client {}, available: {}, held: {}, total: {}, locked: {}",
-                    //     tx_id, self.client_id, self.available, self.held, self.total, self.locked
-                    // );
                 }
             }
             TxRecordType::CHARGEBACK => {
@@ -193,11 +175,6 @@ impl Account {
                         &conflict.amount,
                     );
                     self.locked = true;
-
-                    // println!(
-                    //     "chargeback --> tx_id: {}, client {}, available: {}, held: {}, total: {}, locked: {}",
-                    //     tx_id, self.client_id, self.available, self.held, self.total, self.locked
-                    // );
                 }
             }
             _ => {}

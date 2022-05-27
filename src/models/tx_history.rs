@@ -24,19 +24,6 @@ impl TxHistory {
         }
     }
 
-    // pub fn contains_tx_key(&self, tx_id: u32) -> bool {
-    //     if self.cache.contains_key(&tx_id) {
-    //         return true;
-    //     }
-
-    //     let result = self.db.contains_key(tx_id.to_string().as_bytes());
-    //     if result.is_ok() {
-    //         return result.unwrap();
-    //     }
-
-    //     return false;
-    // }
-
     pub fn get_tx(&mut self, tx_id: &u32) -> Option<TxRow> {
         // check cache
         if let Some(row) = self.cache.get(tx_id) {
