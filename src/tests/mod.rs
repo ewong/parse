@@ -1,6 +1,9 @@
 mod helpers;
 
 #[cfg(test)]
+mod processor_base_test;
+
+#[cfg(test)]
 mod processor_deposit_test;
 
 #[cfg(test)]
